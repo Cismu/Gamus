@@ -53,3 +53,4 @@ debug/
 /tmp
 /dist-isolation
 /.gamus
+/gamus.db

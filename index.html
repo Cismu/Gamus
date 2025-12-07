@@ -10,8 +10,43 @@
 
   <body>
     <main class="container">
-      <button id="load-artists">Cargar artistas</button>
+      <h2>Crear Artista</h2>
+      <form id="artist-form">
+        <input
+          type="text"
+          id="artist-name"
+          placeholder="Nombre del artista"
+          required
+        />
+        <input type="text" id="artist-bio" placeholder="Bio (opcional)" />
+        <button type="submit">Guardar artista</button>
+      </form>
+
+      <h2>Crear Canción</h2>
+      <form id="song-form">
+        <input
+          type="text"
+          id="song-title"
+          placeholder="Título de la canción"
+          required
+        />
+        <input
+          type="text"
+          id="song-acoustid"
+          placeholder="AcoustID (opcional)"
+        />
+        <button type="submit">Guardar canción</button>
+      </form>
+
+      <hr />
+
+      <button id="load-artists">Listar artistas</button>
       <ul id="artists"></ul>
+
+      <button id="load-songs">Listar canciones</button>
+      <ul id="songs"></ul>
     </main>
+
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
