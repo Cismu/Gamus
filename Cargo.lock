@@ -1277,6 +1277,11 @@ dependencies = [
 [[package]]
 name = "gamus-metadata"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "gamus-core",
+ "tokio",
+]
 
 [[package]]
 name = "gamus-scanner"

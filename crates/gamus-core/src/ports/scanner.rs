@@ -48,9 +48,7 @@ pub enum ScanError {
 /// No expone detalles de implementación (Tokio, async, etc.). El adapter
 /// puede ser hiper-paralelo por dentro, pero desde el dominio se ve como
 /// una operación síncrona que devuelve los resultados ya agrupados.
-
-#[async_trait] // <--- La magia
+#[async_trait]
 pub trait FileScanner: Send + Sync {
-  // Ahora devuelve un Result directo, porque la función en sí es async
   async fn scan_library_files(&self) -> Result<Vec<ScanGroup>, ScanError>;
 }
