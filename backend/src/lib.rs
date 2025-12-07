@@ -95,10 +95,10 @@ struct ScanSummaryDto {
 }
 
 #[tauri::command]
-fn scan_library() -> Result<ScanSummaryDto, String> {
+async fn scan_library() -> Result<ScanSummaryDto, String> {
   let scanner = GamusFileScanner::new();
 
-  let groups = scanner.scan_library_files().map_err(|e| e.to_string())?;
+  let groups = scanner.scan_library_files().await.map_err(|e| e.to_string())?;
 
   let mut total_files = 0usize;
   let mut devices = Vec::new();

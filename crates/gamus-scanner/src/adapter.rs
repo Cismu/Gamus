@@ -1,17 +1,16 @@
+use async_trait::async_trait;
+
 use gamus_core::ports::scanner::{
   FileScanner as CoreFileScanner, ScanDevice, ScanError as CoreScanError, ScanGroup,
   ScannedFile as CoreScannedFile,
 };
 
-use crate::fs_scanner::{FsScanGroup, FsScannedFile, ScannerError, scan_groups_sync};
+use crate::fs_scanner::{FsScanGroup, FsScannedFile, ScannerError, scan_groups_async};
 
 /// Implementación de `FileScanner` para Gamus:
 /// - usa config `[scanner]`
 /// - recorre FS con `gamus-fs`
 /// - agrupa por dispositivo y añade `bandwidth_mb_s`.
-///
-/// Internamente es async + spawn_blocking, pero hacia el dominio
-/// expone una API **síncrona y limpia**.
 pub struct GamusFileScanner;
 
 impl GamusFileScanner {
@@ -20,9 +19,10 @@ impl GamusFileScanner {
   }
 }
 
+#[async_trait]
 impl CoreFileScanner for GamusFileScanner {
-  fn scan_library_files(&self) -> Result<Vec<ScanGroup>, CoreScanError> {
-    let groups = scan_groups_sync().map_err(map_scanner_error)?;
+  async fn scan_library_files(&self) -> Result<Vec<ScanGroup>, CoreScanError> {
+    let groups = scan_groups_async().await.map_err(map_scanner_error)?;
 
     let mapped: Vec<ScanGroup> = groups
       .into_iter()

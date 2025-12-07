@@ -6,7 +6,7 @@ use std::time::UNIX_EPOCH;
 
 use futures::StreamExt;
 use thiserror::Error;
-use tokio::{runtime::Runtime, task};
+use tokio::task;
 
 use gamus_fs::async_walker::{Filtering, WalkConfig, walk_filtered};
 
@@ -184,19 +184,4 @@ pub async fn scan_groups_async() -> Result<Vec<FsScanGroup>, ScannerError> {
   }
 
   Ok(groups)
-}
-
-/// Wrapper síncrono para `scan_music_from_config`.
-pub fn scan_music_sync() -> Result<Vec<FsScannedFile>, ScannerError> {
-  let rt =
-    Runtime::new().map_err(|e| ScannerError::Walker(format!("tokio runtime init error: {e}")))?;
-  rt.block_on(scan_music_from_config())
-}
-
-/// Wrapper síncrono para `scan_groups_async`
-/// (lo usará el adapter del port de dominio).
-pub fn scan_groups_sync() -> Result<Vec<FsScanGroup>, ScannerError> {
-  let rt =
-    Runtime::new().map_err(|e| ScannerError::Walker(format!("tokio runtime init error: {e}")))?;
-  rt.block_on(scan_groups_async())
 }

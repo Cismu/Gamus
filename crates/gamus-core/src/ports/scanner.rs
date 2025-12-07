@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::path::PathBuf;
 
 /// Información básica de un archivo detectado por el scanner.
@@ -47,6 +48,9 @@ pub enum ScanError {
 /// No expone detalles de implementación (Tokio, async, etc.). El adapter
 /// puede ser hiper-paralelo por dentro, pero desde el dominio se ve como
 /// una operación síncrona que devuelve los resultados ya agrupados.
-pub trait FileScanner {
-  fn scan_library_files(&self) -> Result<Vec<ScanGroup>, ScanError>;
+
+#[async_trait] // <--- La magia
+pub trait FileScanner: Send + Sync {
+  // Ahora devuelve un Result directo, porque la función en sí es async
+  async fn scan_library_files(&self) -> Result<Vec<ScanGroup>, ScanError>;
 }

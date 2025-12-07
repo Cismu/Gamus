@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+async-trait = "0.1.89"
 futures = "0.3.31"
 gamus-config = { version = "0.1.0", path = "../gamus-config" }
 gamus-core = { version = "0.1.0", path = "../gamus-core" }
