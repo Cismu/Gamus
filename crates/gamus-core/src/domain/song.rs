@@ -1,4 +1,4 @@
-use crate::domain::ids::{ArtistId, SongId};
+use crate::domain::ids::SongId;
 use serde::{Deserialize, Serialize};
 
 /// La Canción (Song): La obra musical abstracta.
@@ -10,12 +10,4 @@ pub struct Song {
   pub acoustid: Option<String>,
   /// El título de la canción.
   pub title: String,
-  /// El/los intérprete(s) principal(es) de la canción.
-  pub performer_ids: Vec<ArtistId>,
-  /// El/los artista(s) invitado(s) o colaborador(es).
-  pub featured_ids: Vec<ArtistId>,
-  /// El/los compositor(es) de la letra y/o música.
-  pub composer_ids: Vec<ArtistId>,
-  /// El/los productor(es) que supervisaron la grabación.
-  pub producer_ids: Vec<ArtistId>,
 }

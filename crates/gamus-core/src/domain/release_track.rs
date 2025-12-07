@@ -2,7 +2,10 @@ use std::{path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::ids::{ReleaseId, ReleaseTrackId, SongId};
+use crate::domain::{
+  artist_role::ReleaseTrackArtistCredit,
+  ids::{ReleaseId, ReleaseTrackId, SongId},
+};
 
 /// Identificador único y global para una pista concreta dentro de un release.
 ///
@@ -23,7 +26,8 @@ use crate::domain::ids::{ReleaseId, ReleaseTrackId, SongId};
 /// - orden dentro del release,
 /// - archivo físico asociado,
 /// - detalles técnicos,
-/// - posibles cambios de título sólo para esta edición.
+/// - posibles cambios de título sólo para esta edición,
+/// - créditos de artista específicos para esta pista.
 ///
 /// Un mismo `Song` puede aparecer en varios `ReleaseTrack`
 /// (álbum original, compilación, remaster, edición japonesa, etc.).
@@ -53,6 +57,9 @@ pub struct ReleaseTrack {
   /// - `"Acoustic Version"`
   /// - `"Radio Edit"`
   pub title_override: Option<String>,
+
+  /// Créditos de artista específicos para esta pista.
+  pub artist_credits: Vec<ReleaseTrackArtistCredit>,
 
   // --- Datos Técnicos ---
   /// Información técnica del audio.

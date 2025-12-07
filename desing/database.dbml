@@ -1,0 +1,61 @@
+Project gamus_library {
+  database_type: 'sqlite'
+  Note: 'Offline-first Discogs/Spotify-inspired.'
+}
+
+//////////////////////////////////////////////////////
+// ARTISTS
+//////////////////////////////////////////////////////
+
+Table artists {
+  id uuid [pk]
+  name text [not null, unique]
+  bio text // nullable
+
+  Note: 'Entidad base del artista. Alias y sitios se manejan en tablas separadas.'
+}
+
+Table artist_variations {
+  id uuid [pk]
+  artist_id uuid [not null, ref: > artists.id]
+  variation text [not null]
+
+  indexes {
+    (artist_id, variation) [unique]
+  }
+
+  Note: 'Variaciones del nombre del artista (alias, romanizaciones, traducciones).'
+}
+
+Table artist_sites {
+  id uuid [pk]
+  artist_id uuid [not null, ref: > artists.id]
+  url text [not null]
+
+  indexes {
+    (artist_id, url) [unique]
+  }
+
+  Note: 'Enlaces relevantes del artista (sitios oficiales, Discogs, Wikipedia, etc.).'
+}
+
+Enum ArtistRole {
+  Performer
+  Featured
+  Composer
+  Producer
+  Remixer
+}
+
+Table release_track_artists {
+  id uuid [pk]
+  release_track_id uuid [not null, ref: > release_tracks.id]
+  artist_id uuid [not null, ref: > artists.id]
+  role ArtistRole [not null]
+
+  indexes {
+    (release_track_id, artist_id, role) [unique]
+  }
+
+  Note: 'Roles específicos del artista para una pista en un release.'
+}

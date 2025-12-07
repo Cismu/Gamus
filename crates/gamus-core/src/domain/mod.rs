@@ -1,4 +1,5 @@
 pub mod artist;
+pub mod artist_role;
 pub mod genre_styles;
 pub mod ids;
 pub mod rating;
