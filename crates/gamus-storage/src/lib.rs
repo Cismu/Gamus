@@ -6,6 +6,7 @@ use std::cell::RefCell;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use diesel_migrations::{MigrationHarness, embed_migrations};
 use gamus_core::domain::release::Release;
 use uuid::Uuid;
 
@@ -13,6 +14,8 @@ use gamus_core::domain::{ArtistId, ReleaseId, SongId};
 use gamus_core::domain::{artist::Artist, song::Song};
 use gamus_core::errors::CoreError;
 use gamus_core::ports::LibraryRepository;
+
+pub const MIGRATIONS: diesel_migrations::EmbeddedMigrations = embed_migrations!("migrations");
 
 use crate::models::{ArtistRow, NewArtistRow, NewReleaseRow, NewSongRow, ReleaseRow, SongRow};
 
@@ -22,8 +25,13 @@ pub struct SqliteLibraryRepository {
 
 impl SqliteLibraryRepository {
   pub fn new(database_url: &str) -> Result<Self, CoreError> {
-    let conn = SqliteConnection::establish(database_url)
+    let mut conn = SqliteConnection::establish(database_url)
       .map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    conn
+      .run_pending_migrations(MIGRATIONS)
+      .map_err(|e| CoreError::Repository(format!("migration error: {e}")))?;
+
     Ok(Self { conn: RefCell::new(conn) })
   }
 
@@ -33,11 +41,9 @@ impl SqliteLibraryRepository {
     let cfg = StorageConfig::load().map_err(|e| CoreError::Repository(e.to_string()))?;
     let db_path = cfg.db_path();
 
-    let conn = SqliteConnection::establish(db_path.to_str().unwrap())
-      .map_err(|e| CoreError::Repository(e.to_string()))?;
+    let db_str = db_path.to_str().ok_or_else(|| CoreError::Repository("invalid db path".into()))?;
 
-    // podrías aplicar journal_mode aquí con un PRAGMA si quieres
-    Ok(Self { conn: RefCell::new(conn) })
+    Self::new(db_str)
   }
 
   /// Devuelve todos los artistas de la base de datos.
