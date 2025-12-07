@@ -1,6 +1,6 @@
-Project gamus_library {
+Project gamus_core {
   database_type: 'sqlite'
-  Note: 'Offline-first Discogs/Spotify-inspired.'
+  Note: 'Dominio central de Gamus: artistas, canciones, lanzamientos, pistas y archivos locales.'
 }
 
 //////////////////////////////////////////////////////
@@ -9,8 +9,11 @@ Project gamus_library {
 
 Table artists {
   id uuid [pk]
-  name text [not null, unique]
-  bio text // nullable
+  name text [not null, unique] // nombre canónico
+  bio text                      // biografía opcional
+
+  created_at text [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at text [not null, default: `CURRENT_TIMESTAMP`]
 
   Note: 'Entidad base del artista. Alias y sitios se manejan en tablas separadas.'
 }
@@ -24,7 +27,7 @@ Table artist_variations {
     (artist_id, variation) [unique]
   }
 
-  Note: 'Variaciones del nombre del artista (alias, romanizaciones, traducciones).'
+  Note: 'Variaciones del nombre del artista (alias, romanizaciones, traducciones, etc.).'
 }
 
 Table artist_sites {
@@ -36,8 +39,151 @@ Table artist_sites {
     (artist_id, url) [unique]
   }
 
-  Note: 'Enlaces relevantes del artista (sitios oficiales, Discogs, Wikipedia, etc.).'
+  Note: 'Enlaces relevantes del artista (sitios oficiales, Wikipedia, Discogs, redes sociales...).'
 }
+
+//////////////////////////////////////////////////////
+// SONGS (OBRAS ABSTRACTAS)
+//////////////////////////////////////////////////////
+
+Table songs {
+  id uuid [pk]
+  title text [not null]
+  acoustid text // nullable
+
+  created_at text [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at text [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: 'La obra musical abstracta. No representa una pista ni un archivo concreto.'
+}
+
+//////////////////////////////////////////////////////
+// RELEASES
+//////////////////////////////////////////////////////
+
+Table releases {
+  id uuid [pk]
+  title text [not null]
+
+  // ISO string, texto libre o YYYY-MM-DD, se mantiene genérico
+  release_date text        // nullable
+  country text             // nullable, código país o descripción libre
+  notes text               // notas editoriales opcionales
+
+  created_at text [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at text [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: 'Producto editorial (álbum, EP, single, compilación...). Tipos, géneros y estilos se gestionan en tablas asociadas.'
+}
+
+Table release_main_artists {
+  id uuid [pk]
+  release_id uuid [not null, ref: > releases.id]
+  artist_id uuid [not null, ref: > artists.id]
+
+  indexes {
+    (release_id, artist_id) [unique]
+  }
+
+  Note: 'Artistas principales acreditados para el lanzamiento (album artist).'
+}
+
+//////////////////////////////////////////////////////
+// RELEASE TYPES (Álbum, EP, Single, etc.)
+//////////////////////////////////////////////////////
+
+// En el dominio tienes `ReleaseType` (Album, EP, Single, Compilation, Mix, Custom).
+// Aquí lo modelamos como filas por release, con texto libre.
+
+Table release_types {
+  id uuid [pk]
+  release_id uuid [not null, ref: > releases.id]
+
+  // Texto que mapearás a `ReleaseType` en Rust (Album, EP, Single, etc. o Custom).
+  kind text [not null]
+
+  indexes {
+    (release_id, kind) [unique]
+  }
+
+  Note: 'Tipos asociados a un release (Album, EP, Single, etc.). Para Custom se almacena el string tal cual.'
+}
+
+//////////////////////////////////////////////////////
+// GENRES & STYLES
+//////////////////////////////////////////////////////
+
+Table release_genres {
+  id uuid [pk]
+  release_id uuid [not null, ref: > releases.id]
+  genre text [not null]
+
+  indexes {
+    (release_id, genre) [unique]
+  }
+
+  Note: 'Géneros asociados al release. El valor `genre` se mapea a `Genre` en el dominio.'
+}
+
+Table release_styles {
+  id uuid [pk]
+  release_id uuid [not null, ref: > releases.id]
+  style text [not null]
+
+  indexes {
+    (release_id, style) [unique]
+  }
+
+  Note: 'Estilos asociados al release. Valores estándar (PopRock, Jpop, etc.) o custom.'
+}
+
+//////////////////////////////////////////////////////
+// ARTWORKS
+//////////////////////////////////////////////////////
+
+Table artworks {
+  id uuid [pk]
+  release_id uuid [not null, ref: > releases.id]
+
+  path text [not null]        // ruta local o referencia relativa
+  mime_type text [not null]   // ej: image/jpeg, image/png
+  description text            // nullable
+  hash text                   // hash del contenido (para deduplicar), opcional
+  credits text                // nullable, créditos de portada
+
+  indexes {
+    (release_id, path) [unique]
+  }
+
+  Note: 'Arte asociado a un release. En el dominio se mapea a `Artwork`.'
+}
+
+//////////////////////////////////////////////////////
+// RELEASE TRACKS (estructura dentro del release)
+//////////////////////////////////////////////////////
+
+Table release_tracks {
+  id uuid [pk]
+  release_id uuid [not null, ref: > releases.id]
+  song_id uuid [not null, ref: > songs.id]
+
+  disc_number int [not null, default: 1]
+  track_number int [not null] // 1..n dentro de ese disco
+  title_override text         // nullable
+
+  created_at text [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at text [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (release_id, disc_number, track_number) [unique]
+  }
+
+  Note: 'Pista concreta dentro de un release. Relaciona Release + Song y define orden y título específico.'
+}
+
+//////////////////////////////////////////////////////
+// ARTIST ROLES POR PISTA
+//////////////////////////////////////////////////////
 
 Enum ArtistRole {
   Performer
@@ -52,10 +198,43 @@ Table release_track_artists {
   release_track_id uuid [not null, ref: > release_tracks.id]
   artist_id uuid [not null, ref: > artists.id]
   role ArtistRole [not null]
+  position int               // orden opcional en los créditos
 
   indexes {
     (release_track_id, artist_id, role) [unique]
   }
 
-  Note: 'Roles específicos del artista para una pista en un release.'
+  Note: 'Créditos específicos de artistas para cada pista de un release (por rol).'
+}
+
+//////////////////////////////////////////////////////
+// ARCHIVOS FÍSICOS & DETALLES TÉCNICOS
+//////////////////////////////////////////////////////
+
+Table library_files {
+  id uuid [pk]
+  release_track_id uuid [not null, ref: > release_tracks.id]
+
+  // FileDetails
+  path text [not null, unique]        // ruta absoluta o canonicalizada
+  size_bytes bigint [not null]        // tamaño del archivo
+  modified_unix bigint [not null]     // timestamp UNIX (segundos desde epoch)
+
+  // AudioDetails básicos
+  duration_ms bigint [not null]       // duración en milisegundos
+  bitrate_kbps int                    // nullable
+  sample_rate_hz int                  // nullable
+  channels int                        // nullable
+  fingerprint text                    // nullable (AcoustID / Chromaprint, etc.)
+
+  // AudioAnalysis (opcional)
+  bpm real                            // nullable
+  quality_score real                  // nullable
+  quality_assessment text             // nullable
+  features blob                       // nullable, vector de f32 serializado (embedding)
+
+  added_at text [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at text [not null, default: `CURRENT_TIMESTAMP`]
+
+  Note: 'Archivo físico y detalles técnicos (audio + análisis opcional) asociados a un ReleaseTrack.'
 }
