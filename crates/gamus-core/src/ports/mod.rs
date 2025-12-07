@@ -4,4 +4,4 @@ pub mod scanner;
 
 pub use library_repository::LibraryRepository;
 pub use metadata::MetadataExtractor;
-pub use scanner::FileScanner;
+pub use scanner::{FileScanner, ScanDevice, ScanError, ScanGroup, ScannedFile};

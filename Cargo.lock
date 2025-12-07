@@ -1266,7 +1266,6 @@ name = "gamus-fs"
 version = "0.1.0"
 dependencies = [
  "futures",
- "gamus-config",
  "serde",
  "thiserror 2.0.17",
  "tokio",
@@ -1280,11 +1279,13 @@ version = "0.1.0"
 name = "gamus-scanner"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "gamus-config",
  "gamus-core",
  "gamus-fs",
- "gamus-metadata",
  "serde",
+ "thiserror 2.0.17",
+ "tokio",
 ]
 
 [[package]]
