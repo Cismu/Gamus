@@ -1,6 +1,6 @@
 Project gamus_core {
   database_type: 'sqlite'
-  Note: 'Arquitectura Hexagonal Gamus: Schema verificado 1:1 con Domain Structs.'
+  Note: 'Gamus: Schema verificado 1:1 con Domain Structs.'
 }
 
 // ==========================================
