@@ -7,3 +7,5 @@ pub mod release_track;
 pub mod release_type;
 pub mod song;
 pub mod song_stats;
+
+pub use ids::{ArtistId, ReleaseId, ReleaseTrackId, SongId};

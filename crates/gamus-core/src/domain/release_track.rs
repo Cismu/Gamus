@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-use crate::discography::ids::{ReleaseId, ReleaseTrackId, SongId};
+use crate::domain::ids::{ReleaseId, ReleaseTrackId, SongId};
 
 /// Identificador único y global para una pista concreta dentro de un release.
 ///

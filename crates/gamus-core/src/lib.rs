@@ -1,1 +1,4 @@
-pub mod discography;
+pub mod domain;
+pub mod errors;
+pub mod ports;
+pub mod services;

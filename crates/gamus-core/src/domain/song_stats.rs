@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::discography::rating::AvgRating;
+use crate::domain::rating::AvgRating;
 
 /// Estadísticas de interacción del usuario con la canción.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -1,4 +1,4 @@
-use crate::discography::ids::ArtistId;
+use crate::domain::ids::ArtistId;
 use serde::{Deserialize, Serialize};
 
 /// Representa a un artista dentro del sistema.

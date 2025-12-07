@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::genre_styles::{Genre, Style};
-use crate::discography::ids::{ArtistId, ReleaseId, ReleaseTrackId};
-use crate::discography::release_type::ReleaseType;
+use crate::domain::ids::{ArtistId, ReleaseId, ReleaseTrackId};
+use crate::domain::release_type::ReleaseType;
 
 /// Representa un lanzamiento musical.
 ///

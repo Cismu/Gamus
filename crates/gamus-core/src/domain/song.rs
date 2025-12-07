@@ -1,4 +1,4 @@
-use crate::discography::ids::{ArtistId, SongId};
+use crate::domain::ids::{ArtistId, SongId};
 use serde::{Deserialize, Serialize};
 
 /// La Canción (Song): La obra musical abstracta.
