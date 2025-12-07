@@ -1,50 +1,39 @@
-use crate::ports::{FileScanner, LibraryRepository, MetadataExtractor};
+// crates/gamus-core/src/services/library_service.rs
+use crate::domain::ids::SongId;
+use crate::domain::{
+  rating::{AvgRating, Rating},
+  song::Song,
+};
+use crate::errors::CoreError;
+use crate::ports::library_repository::LibraryRepository;
 
-#[derive(Debug, thiserror::Error)]
-pub enum LibraryError {
-  #[error("repository error: {0}")]
-  Repo(String),
-  #[error("scanner error: {0}")]
-  Scan(String),
-  #[error("metadata error: {0}")]
-  Metadata(String),
-}
-
-pub struct LibraryService<R, S, M>
+pub struct LibraryService<R>
 where
   R: LibraryRepository,
-  S: FileScanner,
-  M: MetadataExtractor,
 {
   repo: R,
-  scanner: S,
-  metadata: M,
 }
 
-impl<R, S, M> LibraryService<R, S, M>
+impl<R> LibraryService<R>
 where
   R: LibraryRepository,
-  S: FileScanner,
-  M: MetadataExtractor,
 {
-  pub fn new(repo: R, scanner: S, metadata: M) -> Self {
-    Self { repo, scanner, metadata }
+  pub fn new(repo: R) -> Self {
+    Self { repo }
   }
 
-  /// Escanea el sistema de archivos, extrae metadatos y guarda en la librería.
-  pub fn import_all(&self) -> Result<(), LibraryError> {
-    let paths = self.scanner.scan_music_dirs().map_err(|e| LibraryError::Scan(e.to_string()))?;
+  /// Asigna una valoración a una canción.
+  ///
+  /// Nota: por ahora esto pisa la media directamente; en el futuro
+  /// podrías guardar el histórico de ratings y recalcular.
+  pub fn rate_song(&self, song_id: SongId, rating: Rating) -> Result<(), CoreError> {
+    let song = self.repo.find_song(song_id)?.ok_or(CoreError::NotFound)?;
 
-    for path in paths {
-      let (song, release, _) = self
-        .metadata
-        .extract_from_path(&path)
-        .map_err(|e| LibraryError::Metadata(e.to_string()))?;
+    // aquí más adelante podrías tener song.stats, etc.
+    // por ahora sería algo tipo:
+    // song.statistics.avg_rating = AvgRating::Rated(rating);
 
-      self.repo.save_song(&song).map_err(|e| LibraryError::Repo(e.to_string()))?;
-      self.repo.save_release(&release).map_err(|e| LibraryError::Repo(e.to_string()))?;
-    }
-
+    self.repo.save_song(&song)?;
     Ok(())
   }
 }
