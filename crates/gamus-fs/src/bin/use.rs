@@ -7,7 +7,7 @@ async fn main() {
   let start_time = Instant::now();
 
   let cfg = WalkConfig { follow_symlinks: false, max_depth: 50, dedup_dirs: true };
-  let root = "/home/undead34/Music";
+  let root = "/home/";
 
   let entries = walk_filtered(root, cfg, |entry| {
     let path = entry.path.clone();
