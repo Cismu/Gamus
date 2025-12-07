@@ -1246,6 +1246,7 @@ name = "gamus-config"
 version = "0.1.0"
 dependencies = [
  "directories",
+ "gamus-fs",
  "once_cell",
  "serde",
  "tempfile",

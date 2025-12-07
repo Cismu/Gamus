@@ -76,6 +76,73 @@ async function scanLibrary() {
   div.innerHTML = html;
 }
 
+type ScannerConfigDto = {
+  roots: string[];
+  audio_exts: string[];
+  ignore_hidden: boolean;
+  max_depth: number | null;
+};
+
+async function loadScannerConfig() {
+  const cfg = await invoke<ScannerConfigDto>("get_scanner_config");
+
+  const rootsArea =
+    document.querySelector<HTMLTextAreaElement>("#scanner-roots");
+  const extsInput = document.querySelector<HTMLInputElement>(
+    "#scanner-audio-exts"
+  );
+  const ignoreHidden = document.querySelector<HTMLInputElement>(
+    "#scanner-ignore-hidden"
+  );
+  const maxDepth =
+    document.querySelector<HTMLInputElement>("#scanner-max-depth");
+
+  if (!rootsArea || !extsInput || !ignoreHidden || !maxDepth) return;
+
+  rootsArea.value = cfg.roots.join("\n");
+  extsInput.value = cfg.audio_exts.join(", ");
+  ignoreHidden.checked = cfg.ignore_hidden;
+  maxDepth.value = cfg.max_depth != null ? String(cfg.max_depth) : "";
+}
+
+async function saveScannerConfig() {
+  const rootsArea =
+    document.querySelector<HTMLTextAreaElement>("#scanner-roots");
+  const extsInput = document.querySelector<HTMLInputElement>(
+    "#scanner-audio-exts"
+  );
+  const ignoreHidden = document.querySelector<HTMLInputElement>(
+    "#scanner-ignore-hidden"
+  );
+  const maxDepth =
+    document.querySelector<HTMLInputElement>("#scanner-max-depth");
+
+  if (!rootsArea || !extsInput || !ignoreHidden || !maxDepth) return;
+
+  const roots = rootsArea.value
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  const audio_exts = extsInput.value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  const maxDepthVal = maxDepth.value.trim();
+  const max_depth = maxDepthVal === "" ? null : Number(maxDepthVal);
+
+  const payload: ScannerConfigDto = {
+    roots,
+    audio_exts,
+    ignore_hidden: ignoreHidden.checked,
+    max_depth: Number.isNaN(max_depth as number) ? null : max_depth,
+  };
+
+  await invoke("save_scanner_config", { input: payload });
+  alert("Scanner config guardada!");
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   document.querySelector("#artist-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -96,6 +163,18 @@ window.addEventListener("DOMContentLoaded", () => {
     scanLibrary().catch((err) => {
       console.error("scan_library error", err);
       alert("Error al escanear biblioteca: " + err);
+    });
+  });
+
+  loadScannerConfig().catch((err) => {
+    console.error("get_scanner_config error", err);
+  });
+
+  document.querySelector("#scanner-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveScannerConfig().catch((err) => {
+      console.error("save_scanner_config error", err);
+      alert("Error al guardar scanner config: " + err);
     });
   });
 });

@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 directories = "6.0.0"
+gamus-fs = { version = "0.1.0", path = "../gamus-fs" }
 once_cell = "1.21.3"
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.17"

@@ -2,7 +2,9 @@ use gamus_core::ports::{FileScanner, LibraryRepository};
 use gamus_storage::SqliteLibraryRepository;
 
 use gamus_scanner::GamusFileScanner;
-use serde::Serialize;
+use gamus_scanner::config::ScannerConfig;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Serialize)]
 struct ArtistDto {
@@ -115,6 +117,48 @@ fn scan_library() -> Result<ScanSummaryDto, String> {
   Ok(ScanSummaryDto { total_files, devices })
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct ScannerConfigDto {
+  roots: Vec<String>,
+  audio_exts: Vec<String>,
+  ignore_hidden: bool,
+  max_depth: Option<u32>,
+}
+
+impl From<ScannerConfig> for ScannerConfigDto {
+  fn from(cfg: ScannerConfig) -> Self {
+    ScannerConfigDto {
+      roots: cfg.roots.into_iter().map(|p| p.to_string_lossy().to_string()).collect(),
+      audio_exts: cfg.audio_exts,
+      ignore_hidden: cfg.ignore_hidden,
+      max_depth: cfg.max_depth,
+    }
+  }
+}
+
+impl From<ScannerConfigDto> for ScannerConfig {
+  fn from(dto: ScannerConfigDto) -> Self {
+    ScannerConfig {
+      roots: dto.roots.into_iter().map(PathBuf::from).collect(),
+      audio_exts: dto.audio_exts,
+      ignore_hidden: dto.ignore_hidden,
+      max_depth: dto.max_depth,
+    }
+  }
+}
+
+#[tauri::command]
+fn get_scanner_config() -> Result<ScannerConfigDto, String> {
+  let cfg = ScannerConfig::load().map_err(|e| e.to_string())?;
+  Ok(ScannerConfigDto::from(cfg))
+}
+
+#[tauri::command]
+fn save_scanner_config(input: ScannerConfigDto) -> Result<(), String> {
+  let cfg = ScannerConfig::from(input);
+  cfg.save().map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -124,7 +168,9 @@ pub fn run() {
       list_songs,
       create_artist,
       create_song,
-      scan_library
+      scan_library,
+      get_scanner_config,
+      save_scanner_config,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

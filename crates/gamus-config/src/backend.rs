@@ -2,7 +2,6 @@ use crate::paths::{ConfigError, GamusPaths};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::fs;
-use std::io::Write;
 
 pub trait ConfigBackend {
   /// Carga una sección (tabla) del TOML como un tipo arbitrario.
@@ -115,16 +114,8 @@ impl ConfigBackend for TomlConfigBackend {
     let serialized = toml::to_string_pretty(&root)
       .map_err(|e| ConfigError::Other(format!("serialize toml: {e}")))?;
 
-    // 6) Escritura atómica: escribir a archivo temporal y renombrar.
-    let tmp_path = path.with_extension("tmp");
-
-    {
-      let mut tmp_file = fs::File::create(&tmp_path)?;
-      tmp_file.write_all(serialized.as_bytes())?;
-      tmp_file.sync_all()?;
-    }
-
-    fs::rename(&tmp_path, &path)?;
+    // 6) Escritura atómica usando gamus-fs.
+    gamus_fs::atomic_write_str(&path, &serialized)?;
 
     Ok(())
   }

@@ -50,6 +50,38 @@
 
       <button id="scan-library">Escanear biblioteca</button>
       <div id="scan-result"></div>
+
+      <hr />
+
+      <section>
+        <h2>Scanner settings</h2>
+        <form id="scanner-form">
+          <label>
+            Roots (uno por línea):
+            <br />
+            <textarea id="scanner-roots" rows="4"></textarea>
+          </label>
+
+          <label>
+            Extensiones de audio (coma separadas):
+            <br />
+            <input id="scanner-audio-exts" type="text" />
+          </label>
+
+          <label>
+            <input id="scanner-ignore-hidden" type="checkbox" />
+            Ignorar archivos ocultos
+          </label>
+
+          <label>
+            Max depth (opcional):
+            <br />
+            <input id="scanner-max-depth" type="number" min="1" />
+          </label>
+
+          <button type="submit">Guardar scanner config</button>
+        </form>
+      </section>
     </main>
 
     <script type="module" src="/src/main.ts"></script>

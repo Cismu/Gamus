@@ -1,8 +1,8 @@
-use gamus_config::{CONFIG_BACKEND, ConfigError, PATHS};
-use serde::Deserialize;
+use gamus_config::{CONFIG_BACKEND, ConfigBackend, ConfigError, PATHS};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ScannerConfig {
   /// Directorios raíz a escanear.
   pub roots: Vec<PathBuf>,
@@ -31,12 +31,12 @@ impl Default for ScannerConfig {
   fn default() -> Self {
     let mut roots = Vec::new();
 
-    if let Some(music_dir) = PATHS.music_dir() {
-      roots.push(music_dir);
+    if let Some(audio_dir) = &PATHS.audio_dir {
+      roots.push(audio_dir.clone());
     }
 
-    if let Some(downloads_dir) = PATHS.downloads_dir() {
-      roots.push(downloads_dir);
+    if let Some(download_dir) = &PATHS.download_dir {
+      roots.push(download_dir.clone());
     }
 
     ScannerConfig {
@@ -50,6 +50,12 @@ impl Default for ScannerConfig {
 
 impl ScannerConfig {
   pub fn load() -> Result<Self, ConfigError> {
-    CONFIG_BACKEND.load_section_with_default("scanner")
+    let cfg = CONFIG_BACKEND.load_section_with_default("scanner")?;
+    CONFIG_BACKEND.save_section("scanner", &cfg)?;
+    Ok(cfg)
+  }
+
+  pub fn save(&self) -> Result<(), ConfigError> {
+    CONFIG_BACKEND.save_section("scanner", self)
   }
 }

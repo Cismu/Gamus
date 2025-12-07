@@ -1,35 +1,33 @@
-use crate::domain::ids::SongId;
-use crate::domain::rating::Rating;
 use crate::errors::CoreError;
-use crate::ports::library_repository::LibraryRepository;
+use crate::ports::{FileScanner, LibraryRepository, MetadataExtractor};
 
-pub struct LibraryService<R>
+pub struct LibraryService<S, M, R>
 where
+  S: FileScanner,
+  M: MetadataExtractor,
   R: LibraryRepository,
 {
+  scanner: S,
+  metadata: M,
   repo: R,
 }
 
-impl<R> LibraryService<R>
+impl<S, M, R> LibraryService<S, M, R>
 where
+  S: FileScanner,
+  M: MetadataExtractor,
   R: LibraryRepository,
 {
-  pub fn new(repo: R) -> Self {
-    Self { repo }
+  pub fn new(scanner: S, metadata: M, repo: R) -> Self {
+    Self { scanner, metadata, repo }
   }
 
-  /// Asigna una valoración a una canción.
-  ///
-  /// Nota: por ahora esto pisa la media directamente; en el futuro
-  /// podrías guardar el histórico de ratings y recalcular.
-  pub fn rate_song(&self, song_id: SongId, _rating: Rating) -> Result<(), CoreError> {
-    let song = self.repo.find_song(song_id)?.ok_or(CoreError::NotFound)?;
-
-    // aquí más adelante podrías tener song.stats, etc.
-    // por ahora sería algo tipo:
-    // song.statistics.avg_rating = AvgRating::Rated(rating);
-
-    self.repo.save_song(&song)?;
+  pub fn import_full(&self) -> Result<(), CoreError> {
+    // 1) scanner.scan_library_files()
+    // 2) para cada ScannedFile:
+    //      - metadata.extract_from_path()
+    //      - guardar Song, Release, ReleaseTrack, LibraryFile vía repo
+    // 3) manejar errores parciales, logs, etc.
     Ok(())
   }
 }
