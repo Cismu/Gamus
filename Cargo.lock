@@ -1267,7 +1267,9 @@ version = "0.1.0"
 dependencies = [
  "diesel",
  "dotenvy",
+ "gamus-config",
  "gamus-core",
+ "serde",
  "uuid",
 ]
 

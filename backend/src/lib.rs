@@ -2,8 +2,6 @@ use gamus_core::ports::LibraryRepository;
 use gamus_storage::SqliteLibraryRepository;
 use serde::Serialize;
 
-const DATABASE_PATH: &str = "../gamus.db";
-
 #[derive(Serialize)]
 struct ArtistDto {
   id: String,
@@ -12,7 +10,7 @@ struct ArtistDto {
 
 #[tauri::command]
 fn list_artists() -> Result<Vec<ArtistDto>, String> {
-  let repo = SqliteLibraryRepository::new(DATABASE_PATH).map_err(|e| e.to_string())?;
+  let repo = SqliteLibraryRepository::new_from_config().map_err(|e| e.to_string())?;
 
   let artists = repo.list_artists().map_err(|e| e.to_string())?;
 
@@ -30,7 +28,7 @@ struct SongDto {
 
 #[tauri::command]
 fn list_songs() -> Result<Vec<SongDto>, String> {
-  let repo = SqliteLibraryRepository::new(DATABASE_PATH).map_err(|e| e.to_string())?;
+  let repo = SqliteLibraryRepository::new_from_config().map_err(|e| e.to_string())?;
 
   let songs = repo.list_songs().map_err(|e| e.to_string())?;
 
@@ -48,7 +46,7 @@ fn create_artist(input: CreateArtistInput) -> Result<(), String> {
   use gamus_core::domain::artist::Artist;
   use gamus_core::domain::ids::ArtistId;
 
-  let repo = SqliteLibraryRepository::new(DATABASE_PATH).map_err(|e| e.to_string())?;
+  let repo = SqliteLibraryRepository::new_from_config().map_err(|e| e.to_string())?;
 
   let artist = Artist {
     id: ArtistId::new(),
@@ -72,7 +70,7 @@ fn create_song(input: CreateSongInput) -> Result<(), String> {
   use gamus_core::domain::ids::SongId;
   use gamus_core::domain::song::Song;
 
-  let repo = SqliteLibraryRepository::new(DATABASE_PATH).map_err(|e| e.to_string())?;
+  let repo = SqliteLibraryRepository::new_from_config().map_err(|e| e.to_string())?;
 
   let song = Song { id: SongId::new(), title: input.title, acoustid: input.acoustid };
 

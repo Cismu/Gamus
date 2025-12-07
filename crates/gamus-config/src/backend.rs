@@ -28,6 +28,41 @@ impl TomlConfigBackend {
   pub fn new(paths: GamusPaths) -> Self {
     Self { paths }
   }
+
+  /// Versión "gentil" que:
+  /// - si no existe el archivo gamus.toml → devuelve `T::default()`
+  /// - si no existe la sección → devuelve `T::default()`
+  /// - si hay un error de parseo → sigue devolviendo error (para no tapar bugs feos)
+  pub fn load_section_with_default<T>(&self, section: &str) -> Result<T, ConfigError>
+  where
+    T: DeserializeOwned + Default,
+  {
+    use std::io::ErrorKind;
+
+    let path = self.paths.config_file();
+    let content = match std::fs::read_to_string(&path) {
+      Ok(c) => c,
+      Err(e) if e.kind() == ErrorKind::NotFound => {
+        // no hay gamus.toml → usar defaults
+        return Ok(T::default());
+      }
+      Err(e) => return Err(e.into()),
+    };
+
+    let toml_val: toml::Value = toml::from_str(&content)?;
+
+    let Some(table) = toml_val.get(section) else {
+      // falta [section] → usar defaults
+      return Ok(T::default());
+    };
+
+    let t: T = table
+      .clone()
+      .try_into()
+      .map_err(|e| ConfigError::Other(format!("decode section [{section}]: {e}")))?;
+
+    Ok(t)
+  }
 }
 
 impl ConfigBackend for TomlConfigBackend {

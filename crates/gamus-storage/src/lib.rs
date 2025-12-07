@@ -1,3 +1,4 @@
+pub mod config;
 pub mod models;
 pub mod schema;
 
@@ -23,6 +24,19 @@ impl SqliteLibraryRepository {
   pub fn new(database_url: &str) -> Result<Self, CoreError> {
     let conn = SqliteConnection::establish(database_url)
       .map_err(|e| CoreError::Repository(e.to_string()))?;
+    Ok(Self { conn: RefCell::new(conn) })
+  }
+
+  pub fn new_from_config() -> Result<Self, CoreError> {
+    use crate::config::StorageConfig;
+
+    let cfg = StorageConfig::load().map_err(|e| CoreError::Repository(e.to_string()))?;
+    let db_path = cfg.db_path();
+
+    let conn = SqliteConnection::establish(db_path.to_str().unwrap())
+      .map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    // podrías aplicar journal_mode aquí con un PRAGMA si quieres
     Ok(Self { conn: RefCell::new(conn) })
   }
 
