@@ -1,189 +1,164 @@
 Project gamus_core {
   database_type: 'sqlite'
-  Note: 'Dominio central de Gamus: artistas, canciones, lanzamientos, pistas y archivos locales.'
+  Note: 'Arquitectura Hexagonal Gamus: Schema verificado 1:1 con Domain Structs.'
 }
 
-//////////////////////////////////////////////////////
-// ARTISTS
-//////////////////////////////////////////////////////
+// ==========================================
+// 1. IDENTITY & ARTISTS
+// ==========================================
 
 Table artists {
   id uuid [pk]
-  name text [not null, unique] // nombre canónico
-  bio text                      // biografía opcional
-
+  name text [not null]        // Rust: String
+  bio text                    // Rust: Option<String> (nullable)
   created_at text [not null, default: `CURRENT_TIMESTAMP`]
   updated_at text [not null, default: `CURRENT_TIMESTAMP`]
-
-  Note: 'Entidad base del artista. Alias y sitios se manejan en tablas separadas.'
 }
 
 Table artist_variations {
   id uuid [pk]
   artist_id uuid [not null, ref: > artists.id]
-  variation text [not null]
-
+  variation text [not null]   // Rust: Vec<String> -> normalized
+  
   indexes {
     (artist_id, variation) [unique]
   }
-
-  Note: 'Variaciones del nombre del artista (alias, romanizaciones, traducciones, etc.).'
 }
 
 Table artist_sites {
   id uuid [pk]
   artist_id uuid [not null, ref: > artists.id]
-  url text [not null]
-
+  url text [not null]         // Rust: Vec<String> -> normalized
+  
   indexes {
     (artist_id, url) [unique]
   }
-
-  Note: 'Enlaces relevantes del artista (sitios oficiales, Wikipedia, Discogs, redes sociales...).'
 }
 
-//////////////////////////////////////////////////////
-// SONGS (OBRAS ABSTRACTAS)
-//////////////////////////////////////////////////////
+// ==========================================
+// 2. SONGS & STATS
+// ==========================================
 
 Table songs {
   id uuid [pk]
-  title text [not null]
-  acoustid text // nullable
-
+  title text [not null]       // Rust: String
+  acoustid text               // Rust: Option<String> (nullable)
   created_at text [not null, default: `CURRENT_TIMESTAMP`]
   updated_at text [not null, default: `CURRENT_TIMESTAMP`]
-
-  Note: 'La obra musical abstracta. No representa una pista ni un archivo concreto.'
 }
 
-//////////////////////////////////////////////////////
-// RELEASES
-//////////////////////////////////////////////////////
+// Domain: SongStats.comments
+Table song_comments {
+  id uuid [pk]
+  song_id uuid [not null, ref: > songs.id]
+  comment text [not null]
+  created_at text [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// Domain: SongStats.avg_rating & ratings count
+// Nota: Guardamos el valor interno (scaled u32) del struct Rating
+Table song_ratings {
+  id uuid [pk]
+  song_id uuid [not null, ref: > songs.id]
+  value_fixed_point int [not null] 
+  created_at text [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// ==========================================
+// 3. RELEASES (PRODUCT)
+// ==========================================
 
 Table releases {
   id uuid [pk]
-  title text [not null]
-
-  // ISO string, texto libre o YYYY-MM-DD, se mantiene genérico
-  release_date text        // nullable
-  country text             // nullable, código país o descripción libre
-  notes text               // notas editoriales opcionales
-
+  title text [not null]       // Rust: String
+  release_date text           // Rust: Option<String>
   created_at text [not null, default: `CURRENT_TIMESTAMP`]
   updated_at text [not null, default: `CURRENT_TIMESTAMP`]
-
-  Note: 'Producto editorial (álbum, EP, single, compilación...). Tipos, géneros y estilos se gestionan en tablas asociadas.'
 }
 
+// Domain: Release.release_type (Vec<ReleaseType>)
+Table release_types {
+  id uuid [pk]
+  release_id uuid [not null, ref: > releases.id]
+  kind text [not null]        // String mapeado desde Enum o Custom
+  
+  indexes {
+    (release_id, kind) [unique]
+  }
+}
+
+// Domain: Release.main_artist_ids
 Table release_main_artists {
   id uuid [pk]
   release_id uuid [not null, ref: > releases.id]
   artist_id uuid [not null, ref: > artists.id]
-
+  
   indexes {
     (release_id, artist_id) [unique]
   }
-
-  Note: 'Artistas principales acreditados para el lanzamiento (album artist).'
 }
 
-//////////////////////////////////////////////////////
-// RELEASE TYPES (Álbum, EP, Single, etc.)
-//////////////////////////////////////////////////////
-
-// En el dominio tienes `ReleaseType` (Album, EP, Single, Compilation, Mix, Custom).
-// Aquí lo modelamos como filas por release, con texto libre.
-
-Table release_types {
-  id uuid [pk]
-  release_id uuid [not null, ref: > releases.id]
-
-  // Texto que mapearás a `ReleaseType` en Rust (Album, EP, Single, etc. o Custom).
-  kind text [not null]
-
-  indexes {
-    (release_id, kind) [unique]
-  }
-
-  Note: 'Tipos asociados a un release (Album, EP, Single, etc.). Para Custom se almacena el string tal cual.'
-}
-
-//////////////////////////////////////////////////////
-// GENRES & STYLES
-//////////////////////////////////////////////////////
-
+// Domain: Release.genres (Vec<Genre>)
 Table release_genres {
   id uuid [pk]
   release_id uuid [not null, ref: > releases.id]
   genre text [not null]
-
+  
   indexes {
     (release_id, genre) [unique]
   }
-
-  Note: 'Géneros asociados al release. El valor `genre` se mapea a `Genre` en el dominio.'
 }
 
+// Domain: Release.styles (Vec<Style>)
 Table release_styles {
   id uuid [pk]
   release_id uuid [not null, ref: > releases.id]
   style text [not null]
-
+  
   indexes {
     (release_id, style) [unique]
   }
-
-  Note: 'Estilos asociados al release. Valores estándar (PopRock, Jpop, etc.) o custom.'
 }
 
-//////////////////////////////////////////////////////
-// ARTWORKS
-//////////////////////////////////////////////////////
-
+// Domain: Release.artworks (Vec<Artwork>)
 Table artworks {
   id uuid [pk]
   release_id uuid [not null, ref: > releases.id]
-
-  path text [not null]        // ruta local o referencia relativa
-  mime_type text [not null]   // ej: image/jpeg, image/png
-  description text            // nullable
-  hash text                   // hash del contenido (para deduplicar), opcional
-  credits text                // nullable, créditos de portada
-
+  path text [not null]        // Rust: PathBuf -> String
+  mime_type text [not null]   // Rust: String
+  description text            // Rust: Option<String>
+  hash text                   // Rust: String
+  credits text                // Rust: Option<String>
+  
   indexes {
     (release_id, path) [unique]
   }
-
-  Note: 'Arte asociado a un release. En el dominio se mapea a `Artwork`.'
 }
 
-//////////////////////////////////////////////////////
-// RELEASE TRACKS (estructura dentro del release)
-//////////////////////////////////////////////////////
+// ==========================================
+// 4. TRACKS (PHYSICAL INSTANCE)
+// ==========================================
 
 Table release_tracks {
   id uuid [pk]
   release_id uuid [not null, ref: > releases.id]
   song_id uuid [not null, ref: > songs.id]
-
-  disc_number int [not null, default: 1]
-  track_number int [not null] // 1..n dentro de ese disco
-  title_override text         // nullable
-
+  
+  disc_number int [not null]   // Rust: u32
+  track_number int [not null]  // Rust: u32
+  title_override text          // Rust: Option<String>
+  
   created_at text [not null, default: `CURRENT_TIMESTAMP`]
   updated_at text [not null, default: `CURRENT_TIMESTAMP`]
-
+  
   indexes {
     (release_id, disc_number, track_number) [unique]
   }
-
-  Note: 'Pista concreta dentro de un release. Relaciona Release + Song y define orden y título específico.'
 }
 
-//////////////////////////////////////////////////////
-// ARTIST ROLES POR PISTA
-//////////////////////////////////////////////////////
+// ==========================================
+// 5. CREDITS (MUSICBRAINZ STYLE)
+// ==========================================
 
 Enum ArtistRole {
   Performer
@@ -193,48 +168,50 @@ Enum ArtistRole {
   Remixer
 }
 
+// Domain: ReleaseTrack.artist_credits
 Table release_track_artists {
   id uuid [pk]
   release_track_id uuid [not null, ref: > release_tracks.id]
   artist_id uuid [not null, ref: > artists.id]
   role ArtistRole [not null]
-  position int               // orden opcional en los créditos
-
+  position int                // Rust: Option<u32>
+  
   indexes {
     (release_track_id, artist_id, role) [unique]
   }
-
-  Note: 'Créditos específicos de artistas para cada pista de un release (por rol).'
 }
 
-//////////////////////////////////////////////////////
-// ARCHIVOS FÍSICOS & DETALLES TÉCNICOS
-//////////////////////////////////////////////////////
+// ==========================================
+// 6. FILES & TECHNICAL DETAILS
+// ==========================================
 
+// Flattening: FileDetails + AudioDetails + AudioAnalysis -> One Table
 Table library_files {
   id uuid [pk]
-  release_track_id uuid [not null, ref: > release_tracks.id]
-
-  // FileDetails
-  path text [not null, unique]        // ruta absoluta o canonicalizada
-  size_bytes bigint [not null]        // tamaño del archivo
-  modified_unix bigint [not null]     // timestamp UNIX (segundos desde epoch)
-
-  // AudioDetails básicos
-  duration_ms bigint [not null]       // duración en milisegundos
-  bitrate_kbps int                    // nullable
-  sample_rate_hz int                  // nullable
-  channels int                        // nullable
-  fingerprint text                    // nullable (AcoustID / Chromaprint, etc.)
-
-  // AudioAnalysis (opcional)
-  bpm real                            // nullable
-  quality_score real                  // nullable
-  quality_assessment text             // nullable
-  features blob                       // nullable, vector de f32 serializado (embedding)
-
+  release_track_id uuid [not null, unique, ref: - release_tracks.id]
+  
+  // --- FileDetails ---
+  path text [not null, unique]        // PathBuf -> String
+  size_bytes bigint [not null]        // u64
+  modified_unix bigint [not null]     // u64
+  
+  // --- AudioDetails ---
+  duration_ms bigint [not null]       // Duration -> ms (u64/i64)
+  bitrate_kbps int                    // Option<u32>
+  sample_rate_hz int                  // Option<u32>
+  channels int                        // Option<u8>
+  fingerprint text                    // Option<String>
+  
+  // --- AudioAnalysis ---
+  bpm real                            // Option<f32>
+  
+  // AudioQuality struct flattening
+  quality_score real                  // AudioQuality.score (f32)
+  quality_assessment text             // AudioQuality.assessment (String)
+  
+  // Features (Embedding)
+  features blob                       // Option<Vec<f32>> serialized
+  
   added_at text [not null, default: `CURRENT_TIMESTAMP`]
   updated_at text [not null, default: `CURRENT_TIMESTAMP`]
-
-  Note: 'Archivo físico y detalles técnicos (audio + análisis opcional) asociados a un ReleaseTrack.'
 }
