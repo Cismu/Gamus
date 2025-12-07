@@ -1232,6 +1232,7 @@ name = "gamus"
 version = "0.1.0"
 dependencies = [
  "gamus-core",
+ "gamus-scanner",
  "gamus-storage",
  "serde",
  "serde_json",

@@ -1,4 +1,4 @@
-use directories::ProjectDirs;
+use directories::{ProjectDirs, UserDirs};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -20,6 +20,10 @@ pub struct GamusPaths {
   pub config_dir: PathBuf,
   pub data_dir: PathBuf,
   pub cache_dir: PathBuf,
+
+  // User dirs
+  pub audio_dir: Option<PathBuf>,
+  pub download_dir: Option<PathBuf>,
 }
 
 impl GamusPaths {
@@ -40,11 +44,15 @@ impl GamusPaths {
       cache_dir = proj_dirs.cache_dir().to_path_buf();
     }
 
+    let user_dirs = UserDirs::new().ok_or(ConfigError::Directories)?;
+    let audio_dir = user_dirs.audio_dir().map(|v| v.into());
+    let download_dir = user_dirs.download_dir().map(|v| v.into());
+
     std::fs::create_dir_all(&config_dir)?;
     std::fs::create_dir_all(&data_dir)?;
     std::fs::create_dir_all(&cache_dir)?;
 
-    Ok(Self { base_dir, config_dir, data_dir, cache_dir })
+    Ok(Self { base_dir, config_dir, data_dir, cache_dir, audio_dir, download_dir })
   }
 
   pub fn detect() -> Result<Self, ConfigError> {
@@ -53,6 +61,14 @@ impl GamusPaths {
 
   pub fn config_file(&self) -> PathBuf {
     self.config_dir.join("gamus.toml")
+  }
+
+  pub fn music_dir(&self) -> Option<PathBuf> {
+    self.audio_dir.clone()
+  }
+
+  pub fn downloads_dir(&self) -> Option<PathBuf> {
+    self.download_dir.clone()
   }
 }
 

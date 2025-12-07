@@ -50,6 +50,32 @@ async function loadSongs() {
   renderList("#songs", songs);
 }
 
+async function scanLibrary() {
+  const result = await invoke<{
+    total_files: number;
+    devices: {
+      id: string;
+      bandwidth_mb_s: number | null;
+      file_count: number;
+    }[];
+  }>("scan_library");
+
+  const div = document.querySelector<HTMLDivElement>("#scan-result");
+  if (!div) return;
+
+  let html = `<p>Total de archivos: ${result.total_files}</p>`;
+  html += "<ul>";
+  for (const d of result.devices) {
+    html +=
+      `<li>Device ${d.id} – ${d.file_count} archivos` +
+      (d.bandwidth_mb_s != null ? ` (~${d.bandwidth_mb_s} MB/s)` : "") +
+      `</li>`;
+  }
+  html += "</ul>";
+
+  div.innerHTML = html;
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   document.querySelector("#artist-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -65,4 +91,11 @@ window.addEventListener("DOMContentLoaded", () => {
     .querySelector("#load-artists")
     ?.addEventListener("click", loadArtists);
   document.querySelector("#load-songs")?.addEventListener("click", loadSongs);
+
+  document.querySelector("#scan-library")?.addEventListener("click", () => {
+    scanLibrary().catch((err) => {
+      console.error("scan_library error", err);
+      alert("Error al escanear biblioteca: " + err);
+    });
+  });
 });

@@ -2,12 +2,13 @@ use crate::paths::{ConfigError, GamusPaths};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::fs;
+use std::io::Write;
 
 pub trait ConfigBackend {
   /// Carga una sección (tabla) del TOML como un tipo arbitrario.
   fn load_section<T: DeserializeOwned>(&self, section: &str) -> Result<T, ConfigError>;
 
-  /// Opcional: guardar cambios (no lo necesitas hoy, pero deja el contrato listo).
+  /// Guarda (crea o reemplaza) una sección completa.
   fn save_section<T: Serialize>(&self, section: &str, value: &T) -> Result<(), ConfigError>;
 }
 
@@ -83,8 +84,48 @@ impl ConfigBackend for TomlConfigBackend {
     Ok(t)
   }
 
-  fn save_section<T: Serialize>(&self, _section: &str, _value: &T) -> Result<(), ConfigError> {
-    // lo puedes implementar luego, por ahora no lo necesitas
-    Err(ConfigError::Other("save_section not implemented".into()))
+  fn save_section<T: Serialize>(&self, section: &str, value: &T) -> Result<(), ConfigError> {
+    use std::io::ErrorKind;
+
+    let path = self.paths.config_file();
+
+    // 1) Leer config actual, o crear documento vacío si no existe.
+    let mut root: toml::Value = match fs::read_to_string(&path) {
+      Ok(content) => toml::from_str(&content)?,
+      Err(e) if e.kind() == ErrorKind::NotFound => {
+        // archivo no existe → empezamos con tabla raíz vacía
+        toml::Value::Table(toml::map::Map::new())
+      }
+      Err(e) => return Err(e.into()),
+    };
+
+    // 2) Asegurarnos de que la raíz es una tabla.
+    let root_table = root.as_table_mut().ok_or_else(|| {
+      ConfigError::Other(format!("config file {:?} does not contain a TOML table at root", path))
+    })?;
+
+    // 3) Serializar la sección a toml::Value.
+    let section_val = toml::Value::try_from(value)
+      .map_err(|e| ConfigError::Other(format!("encode section [{section}]: {e}")))?;
+
+    // 4) Insertar o reemplazar la tabla de esa sección.
+    root_table.insert(section.to_string(), section_val);
+
+    // 5) Serializar todo el documento de vuelta a String.
+    let serialized = toml::to_string_pretty(&root)
+      .map_err(|e| ConfigError::Other(format!("serialize toml: {e}")))?;
+
+    // 6) Escritura atómica: escribir a archivo temporal y renombrar.
+    let tmp_path = path.with_extension("tmp");
+
+    {
+      let mut tmp_file = fs::File::create(&tmp_path)?;
+      tmp_file.write_all(serialized.as_bytes())?;
+      tmp_file.sync_all()?;
+    }
+
+    fs::rename(&tmp_path, &path)?;
+
+    Ok(())
   }
 }

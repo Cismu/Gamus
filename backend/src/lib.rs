@@ -1,5 +1,7 @@
-use gamus_core::ports::LibraryRepository;
+use gamus_core::ports::{FileScanner, LibraryRepository};
 use gamus_storage::SqliteLibraryRepository;
+
+use gamus_scanner::GamusFileScanner;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -77,11 +79,53 @@ fn create_song(input: CreateSongInput) -> Result<(), String> {
   repo.save_song(&song).map_err(|e| e.to_string())
 }
 
+#[derive(Serialize)]
+struct DeviceSummaryDto {
+  id: String,
+  bandwidth_mb_s: Option<u64>,
+  file_count: usize,
+}
+
+#[derive(Serialize)]
+struct ScanSummaryDto {
+  total_files: usize,
+  devices: Vec<DeviceSummaryDto>,
+}
+
+#[tauri::command]
+fn scan_library() -> Result<ScanSummaryDto, String> {
+  let scanner = GamusFileScanner::new();
+
+  let groups = scanner.scan_library_files().map_err(|e| e.to_string())?;
+
+  let mut total_files = 0usize;
+  let mut devices = Vec::new();
+
+  for g in groups {
+    let count = g.files.len();
+    total_files += count;
+
+    devices.push(DeviceSummaryDto {
+      id: g.device.id,
+      bandwidth_mb_s: g.device.bandwidth_mb_s,
+      file_count: count,
+    });
+  }
+
+  Ok(ScanSummaryDto { total_files, devices })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_opener::init())
-    .invoke_handler(tauri::generate_handler![list_artists, list_songs, create_artist, create_song])
+    .invoke_handler(tauri::generate_handler![
+      list_artists,
+      list_songs,
+      create_artist,
+      create_song,
+      scan_library
+    ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
