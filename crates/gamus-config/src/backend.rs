@@ -1,0 +1,55 @@
+use crate::paths::{ConfigError, GamusPaths};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use std::fs;
+
+pub trait ConfigBackend {
+  /// Carga una sección (tabla) del TOML como un tipo arbitrario.
+  fn load_section<T: DeserializeOwned>(&self, section: &str) -> Result<T, ConfigError>;
+
+  /// Opcional: guardar cambios (no lo necesitas hoy, pero deja el contrato listo).
+  fn save_section<T: Serialize>(&self, section: &str, value: &T) -> Result<(), ConfigError>;
+}
+
+/// Implementación que usa un gamus.toml con varias tablas:
+///
+/// ```toml
+/// [fs]
+/// audio_exts = ["mp3", "flac"]
+///
+/// [storage]
+/// db_filename = "gamus.db"
+/// ```
+pub struct TomlConfigBackend {
+  paths: GamusPaths,
+}
+
+impl TomlConfigBackend {
+  pub fn new(paths: GamusPaths) -> Self {
+    Self { paths }
+  }
+}
+
+impl ConfigBackend for TomlConfigBackend {
+  fn load_section<T: DeserializeOwned>(&self, section: &str) -> Result<T, ConfigError> {
+    let path = self.paths.config_file();
+    let content = fs::read_to_string(&path)?;
+    let toml_val: toml::Value = toml::from_str(&content)?;
+
+    let table = toml_val
+      .get(section)
+      .ok_or_else(|| ConfigError::Other(format!("missing section [{section}] in {:?}", path)))?;
+
+    let t: T = table
+      .clone()
+      .try_into()
+      .map_err(|e| ConfigError::Other(format!("decode section [{section}]: {e}")))?;
+
+    Ok(t)
+  }
+
+  fn save_section<T: Serialize>(&self, _section: &str, _value: &T) -> Result<(), ConfigError> {
+    // lo puedes implementar luego, por ahora no lo necesitas
+    Err(ConfigError::Other("save_section not implemented".into()))
+  }
+}

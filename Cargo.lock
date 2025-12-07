@@ -1221,6 +1221,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gamus-config"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "serde",
+ "thiserror 2.0.17",
+ "toml 0.9.8",
+]
+
+[[package]]
 name = "gamus-core"
 version = "0.1.0"
 dependencies = [
@@ -1234,6 +1244,8 @@ name = "gamus-fs"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "gamus-config",
+ "serde",
  "thiserror 2.0.17",
  "tokio",
 ]

@@ -1,11 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 use futures::StreamExt;
 use thiserror::Error;
 
 use crate::async_walker::{Filtering, WalkConfig, walk_filtered};
+use crate::config::FsConfig;
 
 #[derive(Debug, Error)]
 pub enum FsError {
@@ -14,6 +15,9 @@ pub enum FsError {
 
   #[error("walker error: {0}")]
   Walker(String),
+
+  #[error("config error: {0}")]
+  Config(#[from] gamus_config::ConfigError),
 }
 
 /// Info mínima que nos interesa de un archivo de audio.
@@ -30,13 +34,14 @@ pub struct ScannedFile {
 }
 
 /// Extensiones que consideramos “audio” por ahora.
-fn is_audio(path: &Path) -> bool {
-  const AUDIO_EXTS: &[&str] = &["mp3", "flac", "wav", "ogg", "m4a", "opus"];
 
-  match path.extension().and_then(|e| e.to_str()) {
-    Some(ext) => AUDIO_EXTS.contains(&ext.to_lowercase().as_str()),
-    None => false,
-  }
+fn is_audio(path: &Path, cfg: &FsConfig) -> bool {
+  let ext = match path.extension().and_then(|e| e.to_str()) {
+    Some(e) => e.to_lowercase(),
+    None => return false,
+  };
+
+  cfg.audio_exts.iter().any(|cfg_ext| cfg_ext.eq_ignore_ascii_case(&ext))
 }
 
 fn file_metadata(path: &Path) -> Result<(u64, u64), FsError> {
@@ -52,9 +57,15 @@ fn file_metadata(path: &Path) -> Result<(u64, u64), FsError> {
 ///
 /// Esto es ideal para luego mapear a `FileDetails` + `library_files`.
 pub async fn scan_music_files(root: &str) -> Result<Vec<ScannedFile>, FsError> {
-  let cfg = WalkConfig { follow_symlinks: false, max_depth: 64, dedup_dirs: true };
+  let cfg = FsConfig::load()?;
 
-  let entries = walk_filtered(root, cfg, |entry| {
+  let walk_cfg = WalkConfig {
+    follow_symlinks: false,
+    max_depth: cfg.max_depth.unwrap_or(50) as usize,
+    dedup_dirs: true,
+  };
+
+  let entries = walk_filtered(root, walk_cfg, |entry| {
     let path = entry.path.clone();
 
     async move {
@@ -89,7 +100,7 @@ pub async fn scan_music_files(root: &str) -> Result<Vec<ScannedFile>, FsError> {
 
     let path = entry.path;
 
-    if path.is_file() && is_audio(&path) {
+    if path.is_file() && is_audio(&path, &cfg) {
       match file_metadata(&path) {
         Ok((size, modified)) => files.push(ScannedFile { path, size, modified }),
         Err(e) => {

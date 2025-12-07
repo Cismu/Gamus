@@ -1,0 +1,11 @@
+[package]
+name = "gamus-config"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+once_cell = "1.21.3"
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.17"
+toml = "0.9.8"
