@@ -1,5 +1,4 @@
 use directories::ProjectDirs;
-use once_cell::sync::Lazy;
 use std::path::PathBuf;
 use thiserror::Error;
 
