@@ -1273,6 +1273,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "gamus-metadata"
+version = "0.1.0"
+
+[[package]]
+name = "gamus-scanner"
+version = "0.1.0"
+dependencies = [
+ "gamus-config",
+ "gamus-core",
+ "gamus-fs",
+ "gamus-metadata",
+ "serde",
+]
+
+[[package]]
 name = "gamus-storage"
 version = "0.1.0"
 dependencies = [
