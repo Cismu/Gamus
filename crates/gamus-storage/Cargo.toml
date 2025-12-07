@@ -8,6 +8,7 @@ license.workspace = true
 diesel = { version = "2.3.4", features = [
     "sqlite",
     "returning_clauses_for_sqlite_3_35",
+    "r2d2",
 ] }
 diesel_migrations = { version = "2.3.1", features = ["sqlite"] }
 gamus-config = { version = "0.1.0", path = "../gamus-config" }

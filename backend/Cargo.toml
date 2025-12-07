@@ -26,3 +26,4 @@ serde_json = "1"
 gamus-core = { version = "0.1.0", path = "../crates/gamus-core" }
 gamus-storage = { version = "0.1.0", path = "../crates/gamus-storage" }
 gamus-scanner = { version = "0.1.0", path = "../crates/gamus-scanner" }
+anyhow = "1.0.100"
