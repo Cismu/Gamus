@@ -23,6 +23,18 @@ impl SqliteLibraryRepository {
       .map_err(|e| CoreError::Repository(e.to_string()))?;
     Ok(Self { conn: RefCell::new(conn) })
   }
+
+  /// Devuelve todos los artistas de la base de datos.
+  pub fn list_artists(&self) -> Result<Vec<Artist>, CoreError> {
+    use crate::schema::artists::dsl::*;
+
+    let mut conn = self.conn.borrow_mut();
+
+    let rows: Vec<ArtistRow> =
+      artists.load::<ArtistRow>(&mut *conn).map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    Ok(rows.into_iter().map(row_to_artist).collect())
+  }
 }
 
 fn artist_to_new_row(artist: &Artist) -> NewArtistRow {

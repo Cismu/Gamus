@@ -1,22 +1,30 @@
 import { invoke } from "@tauri-apps/api/core";
 
-let greetInputEl: HTMLInputElement | null;
-let greetMsgEl: HTMLElement | null;
+type ArtistDto = { id: string; name: string };
 
-async function greet() {
-  if (greetMsgEl && greetInputEl) {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsgEl.textContent = await invoke("greet", {
-      name: greetInputEl.value,
+async function loadArtists() {
+  try {
+    const artists = await invoke<ArtistDto[]>("list_artists");
+
+    const list = document.querySelector<HTMLUListElement>("#artists");
+    if (!list) return;
+
+    list.innerHTML = "";
+    artists.forEach((artist) => {
+      const li = document.createElement("li");
+      li.textContent = `${artist.name} (${artist.id})`;
+      list.appendChild(li);
     });
+  } catch (err) {
+    console.error("Error loading artists", err);
   }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  greetInputEl = document.querySelector("#greet-input");
-  greetMsgEl = document.querySelector("#greet-msg");
-  document.querySelector("#greet-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    greet();
-  });
+  const btn = document.querySelector<HTMLButtonElement>("#load-artists");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      loadArtists();
+    });
+  }
 });
