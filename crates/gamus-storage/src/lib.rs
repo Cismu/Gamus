@@ -5,13 +5,14 @@ use std::cell::RefCell;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use uuid::Uuid;
 
-use gamus_core::domain::artist::Artist;
-use gamus_core::domain::ids::ArtistId;
+use gamus_core::domain::{ArtistId, SongId};
+use gamus_core::domain::{artist::Artist, song::Song};
 use gamus_core::errors::CoreError;
 use gamus_core::ports::LibraryRepository;
 
-use crate::models::{ArtistRow, NewArtistRow};
+use crate::models::{ArtistRow, NewArtistRow, NewSongRow, SongRow};
 
 pub struct SqliteLibraryRepository {
   conn: RefCell<SqliteConnection>,
@@ -41,15 +42,25 @@ fn artist_to_new_row(artist: &Artist) -> NewArtistRow {
   NewArtistRow { id: artist.id.to_string(), name: artist.name.clone(), bio: artist.bio.clone() }
 }
 
-fn row_to_artist(row: ArtistRow) -> Artist {
-  use uuid::Uuid;
+fn song_to_new_row(song: &Song) -> NewSongRow {
+  NewSongRow { id: song.id.to_string(), title: song.title.clone(), acoustid: song.acoustid.clone() }
+}
 
+fn row_to_artist(row: ArtistRow) -> Artist {
   Artist {
     id: ArtistId::from_uuid(Uuid::parse_str(&row.id).expect("invalid uuid in DB")),
     name: row.name,
     variations: vec![],
     bio: row.bio,
     sites: vec![],
+  }
+}
+
+fn row_to_song(row: SongRow) -> Song {
+  Song {
+    id: SongId::from_uuid(Uuid::parse_str(&row.id).expect("invalid uuid in DB")),
+    title: row.title,
+    acoustid: row.acoustid,
   }
 }
 
@@ -71,8 +82,21 @@ impl LibraryRepository for SqliteLibraryRepository {
     Ok(())
   }
 
-  fn save_song(&self, _song: &gamus_core::domain::song::Song) -> Result<(), CoreError> {
-    unimplemented!()
+  fn save_song(&self, song: &Song) -> Result<(), CoreError> {
+    use crate::schema::songs::dsl::*;
+
+    let new_row = song_to_new_row(song);
+    let mut conn = self.conn.borrow_mut();
+
+    diesel::insert_into(songs)
+      .values(&new_row)
+      .on_conflict(id)
+      .do_update()
+      .set((title.eq(&song.title), acoustid.eq(song.acoustid.as_deref())))
+      .execute(&mut *conn)
+      .map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    Ok(())
   }
 
   fn save_release(&self, _release: &gamus_core::domain::release::Release) -> Result<(), CoreError> {
@@ -95,11 +119,20 @@ impl LibraryRepository for SqliteLibraryRepository {
     Ok(row_opt.map(row_to_artist))
   }
 
-  fn find_song(
-    &self,
-    _id: gamus_core::domain::ids::SongId,
-  ) -> Result<Option<gamus_core::domain::song::Song>, CoreError> {
-    unimplemented!()
+  fn find_song(&self, song_id: SongId) -> Result<Option<Song>, CoreError> {
+    use crate::schema::songs::dsl::*;
+    use diesel::OptionalExtension;
+
+    let id_str = song_id.to_string();
+    let mut conn = self.conn.borrow_mut();
+
+    let row_opt = songs
+      .filter(id.eq(id_str))
+      .first::<SongRow>(&mut *conn)
+      .optional()
+      .map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    Ok(row_opt.map(row_to_song))
   }
 
   fn find_release(

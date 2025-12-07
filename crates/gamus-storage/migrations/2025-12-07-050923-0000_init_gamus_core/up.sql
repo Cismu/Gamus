@@ -1,6 +1,3 @@
--- Habilitar claves foráneas (por seguridad en SQLite, aunque Diesel suele manejarlo)
-PRAGMA foreign_keys = ON;
-
 ----------------------------------------------------------
 -- 1. IDENTITY & ARTISTS
 ----------------------------------------------------------
@@ -8,8 +5,9 @@ CREATE TABLE artists (
   id TEXT PRIMARY KEY NOT NULL, -- UUID v4
   name TEXT NOT NULL,
   bio TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  -- Fechas como TEXT para mapear directo a String en Rust
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE artist_variations (
@@ -33,22 +31,22 @@ CREATE TABLE songs (
   id TEXT PRIMARY KEY NOT NULL,
   title TEXT NOT NULL,
   acoustid TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE song_comments (
   id TEXT PRIMARY KEY NOT NULL,
   song_id TEXT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
   comment TEXT NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE song_ratings (
   id TEXT PRIMARY KEY NOT NULL,
   song_id TEXT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
   value_fixed_point INTEGER NOT NULL, -- u32 Fixed Point
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 ----------------------------------------------------------
@@ -57,15 +55,15 @@ CREATE TABLE song_ratings (
 CREATE TABLE releases (
   id TEXT PRIMARY KEY NOT NULL,
   title TEXT NOT NULL,
-  release_date TEXT, -- Guardamos String flexible
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  release_date TEXT, -- Ya era TEXT, se mantiene
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE release_types (
   id TEXT PRIMARY KEY NOT NULL,
   release_id TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL, -- Enum o Custom string
+  kind TEXT NOT NULL,
   UNIQUE(release_id, kind)
 );
 
@@ -107,12 +105,12 @@ CREATE TABLE artworks (
 CREATE TABLE release_tracks (
   id TEXT PRIMARY KEY NOT NULL,
   release_id TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
-  song_id TEXT NOT NULL REFERENCES songs(id) ON DELETE RESTRICT, -- No borrar canción si existe el track
+  song_id TEXT NOT NULL REFERENCES songs(id) ON DELETE RESTRICT,
   disc_number INTEGER NOT NULL DEFAULT 1,
   track_number INTEGER NOT NULL,
   title_override TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(release_id, disc_number, track_number)
 );
 
@@ -123,7 +121,7 @@ CREATE TABLE release_track_artists (
   id TEXT PRIMARY KEY NOT NULL,
   release_track_id TEXT NOT NULL REFERENCES release_tracks(id) ON DELETE CASCADE,
   artist_id TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
-  role TEXT NOT NULL, -- Enum 'Performer', 'Composer', etc.
+  role TEXT NOT NULL,
   position INTEGER,
   UNIQUE(release_track_id, artist_id, role)
 );
@@ -151,9 +149,9 @@ CREATE TABLE library_files (
   bpm REAL,
   quality_score REAL,
   quality_assessment TEXT,
-  features BLOB, -- Vector serializado
+  features BLOB, 
   
-  added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(release_track_id)
 );

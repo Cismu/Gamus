@@ -43,9 +43,9 @@ diesel::table! {
         id -> Text,
         release_track_id -> Text,
         path -> Text,
-        size_bytes -> Integer,
-        modified_unix -> Integer,
-        duration_ms -> Integer,
+        size_bytes -> BigInt,
+        modified_unix -> BigInt,
+        duration_ms -> BigInt,
         bitrate_kbps -> Nullable<Integer>,
         sample_rate_hz -> Nullable<Integer>,
         channels -> Nullable<Integer>,
@@ -119,10 +119,26 @@ diesel::table! {
         id -> Text,
         title -> Text,
         release_date -> Nullable<Text>,
-        country -> Nullable<Text>,
-        notes -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    song_comments (id) {
+        id -> Text,
+        song_id -> Text,
+        comment -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    song_ratings (id) {
+        id -> Text,
+        song_id -> Text,
+        value_fixed_point -> Integer,
+        created_at -> Text,
     }
 }
 
@@ -149,6 +165,8 @@ diesel::joinable!(release_track_artists -> release_tracks (release_track_id));
 diesel::joinable!(release_tracks -> releases (release_id));
 diesel::joinable!(release_tracks -> songs (song_id));
 diesel::joinable!(release_types -> releases (release_id));
+diesel::joinable!(song_comments -> songs (song_id));
+diesel::joinable!(song_ratings -> songs (song_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
   artist_sites,
@@ -163,5 +181,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   release_tracks,
   release_types,
   releases,
+  song_comments,
+  song_ratings,
   songs,
 );
