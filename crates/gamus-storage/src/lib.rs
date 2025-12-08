@@ -76,29 +76,6 @@ impl SqliteLibraryRepository {
   }
 }
 
-// --- Métodos de consulta directos (fuera del trait si los necesitas públicos) ---
-impl SqliteLibraryRepository {
-  pub fn list_artists(&self) -> Result<Vec<Artist>, CoreError> {
-    use crate::schema::artists::dsl::*;
-    let mut conn = self.get_conn()?;
-
-    let rows: Vec<ArtistRow> =
-      artists.load::<ArtistRow>(&mut conn).map_err(|e| CoreError::Repository(e.to_string()))?;
-
-    Ok(rows.into_iter().map(row_to_artist).collect())
-  }
-
-  pub fn list_songs(&self) -> Result<Vec<Song>, CoreError> {
-    use crate::schema::songs::dsl::*;
-    let mut conn = self.get_conn()?;
-
-    let rows =
-      songs.load::<SongRow>(&mut conn).map_err(|e| CoreError::Repository(e.to_string()))?;
-
-    Ok(rows.into_iter().map(row_to_song).collect())
-  }
-}
-
 // --- Implementación del Trait ---
 impl LibraryRepository for SqliteLibraryRepository {
   fn save_artist(&self, artist: &Artist) -> Result<(), CoreError> {
@@ -198,6 +175,37 @@ impl LibraryRepository for SqliteLibraryRepository {
       .map_err(|e| CoreError::Repository(e.to_string()))?;
 
     Ok(row_opt.map(row_to_release))
+  }
+
+  // --- Nuevas implementaciones de Listado (movidas del bloque anterior) ---
+  fn list_artists(&self) -> Result<Vec<Artist>, CoreError> {
+    use crate::schema::artists::dsl::*;
+    let mut conn = self.get_conn()?;
+
+    let rows: Vec<ArtistRow> =
+      artists.load::<ArtistRow>(&mut conn).map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    Ok(rows.into_iter().map(row_to_artist).collect())
+  }
+
+  fn list_songs(&self) -> Result<Vec<Song>, CoreError> {
+    use crate::schema::songs::dsl::*;
+    let mut conn = self.get_conn()?;
+
+    let rows =
+      songs.load::<SongRow>(&mut conn).map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    Ok(rows.into_iter().map(row_to_song).collect())
+  }
+
+  fn list_releases(&self) -> Result<Vec<Release>, CoreError> {
+    use crate::schema::releases::dsl::*;
+    let mut conn = self.get_conn()?;
+
+    let rows =
+      releases.load::<ReleaseRow>(&mut conn).map_err(|e| CoreError::Repository(e.to_string()))?;
+
+    Ok(rows.into_iter().map(row_to_release).collect())
   }
 }
 

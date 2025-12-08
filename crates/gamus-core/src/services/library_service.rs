@@ -1,3 +1,7 @@
+use crate::domain::artist::Artist;
+use crate::domain::release::Release;
+use crate::domain::song::Song;
+use crate::domain::{ArtistId, ReleaseId, SongId};
 use crate::errors::CoreError;
 use crate::ports::{FileScanner, LibraryRepository, MetadataExtractor};
 
@@ -72,5 +76,31 @@ where
     }
 
     Ok(())
+  }
+
+  // -------- QUERY (read) --------
+
+  pub fn list_artists(&self) -> Result<Vec<Artist>, CoreError> {
+    self.repo.list_artists()
+  }
+
+  pub fn list_songs(&self) -> Result<Vec<Song>, CoreError> {
+    self.repo.list_songs()
+  }
+
+  pub fn list_releases(&self) -> Result<Vec<Release>, CoreError> {
+    self.repo.list_releases()
+  }
+
+  pub fn get_artist(&self, id: ArtistId) -> Result<Option<Artist>, CoreError> {
+    self.repo.find_artist(id)
+  }
+
+  pub fn get_song(&self, id: SongId) -> Result<Option<Song>, CoreError> {
+    self.repo.find_song(id)
+  }
+
+  pub fn get_release(&self, id: ReleaseId) -> Result<Option<Release>, CoreError> {
+    self.repo.find_release(id)
   }
 }
