@@ -3,23 +3,14 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::fs;
 
-pub trait ConfigBackend {
-  /// Carga una sección (tabla) del TOML como un tipo arbitrario.
-  fn load_section<T: DeserializeOwned>(&self, section: &str) -> Result<T, ConfigError>;
+/// NUEVO: usa toml_edit para escritura preservando comentarios
+use toml_edit::{DocumentMut, Item};
 
-  /// Guarda (crea o reemplaza) una sección completa.
+pub trait ConfigBackend {
+  fn load_section<T: DeserializeOwned>(&self, section: &str) -> Result<T, ConfigError>;
   fn save_section<T: Serialize>(&self, section: &str, value: &T) -> Result<(), ConfigError>;
 }
 
-/// Implementación que usa un gamus.toml con varias tablas:
-///
-/// ```toml
-/// [fs]
-/// audio_exts = ["mp3", "flac"]
-///
-/// [storage]
-/// db_filename = "gamus.db"
-/// ```
 pub struct TomlConfigBackend {
   paths: GamusPaths,
 }
@@ -29,10 +20,6 @@ impl TomlConfigBackend {
     Self { paths }
   }
 
-  /// Versión "gentil" que:
-  /// - si no existe el archivo gamus.toml → devuelve `T::default()`
-  /// - si no existe la sección → devuelve `T::default()`
-  /// - si hay un error de parseo → sigue devolviendo error (para no tapar bugs feos)
   pub fn load_section_with_default<T>(&self, section: &str) -> Result<T, ConfigError>
   where
     T: DeserializeOwned + Default,
@@ -43,16 +30,15 @@ impl TomlConfigBackend {
     let content = match std::fs::read_to_string(&path) {
       Ok(c) => c,
       Err(e) if e.kind() == ErrorKind::NotFound => {
-        // no hay gamus.toml → usar defaults
         return Ok(T::default());
       }
       Err(e) => return Err(e.into()),
     };
 
+    // Aquí puedes seguir con `toml` normal sin problema
     let toml_val: toml::Value = toml::from_str(&content)?;
 
     let Some(table) = toml_val.get(section) else {
-      // falta [section] → usar defaults
       return Ok(T::default());
     };
 
@@ -88,31 +74,36 @@ impl ConfigBackend for TomlConfigBackend {
 
     let path = self.paths.config_file();
 
-    // 1) Leer config actual, o crear documento vacío si no existe.
-    let mut root: toml::Value = match fs::read_to_string(&path) {
-      Ok(content) => toml::from_str(&content)?,
+    // 1) Leer config actual como DocumentMut o crear doc vacío si no existe.
+    let mut doc: DocumentMut = match fs::read_to_string(&path) {
+      Ok(content) => content
+        .parse::<DocumentMut>()
+        .map_err(|e| ConfigError::Other(format!("parse toml_edit doc: {e}")))?,
       Err(e) if e.kind() == ErrorKind::NotFound => {
-        // archivo no existe → empezamos con tabla raíz vacía
-        toml::Value::Table(toml::map::Map::new())
+        // documento nuevo
+        DocumentMut::new()
       }
       Err(e) => return Err(e.into()),
     };
 
-    // 2) Asegurarnos de que la raíz es una tabla.
-    let root_table = root.as_table_mut().ok_or_else(|| {
-      ConfigError::Other(format!("config file {:?} does not contain a TOML table at root", path))
-    })?;
-
-    // 3) Serializar la sección a toml::Value.
-    let section_val = toml::Value::try_from(value)
+    // 2) Serializar el valor de la sección con `toml` normal (serde) a string.
+    let section_str = toml::to_string(value)
       .map_err(|e| ConfigError::Other(format!("encode section [{section}]: {e}")))?;
 
-    // 4) Insertar o reemplazar la tabla de esa sección.
-    root_table.insert(section.to_string(), section_val);
+    // 3) Parsear esa representación parcial a `toml_edit::Item`.
+    //    Ojo: `section_str` suele tener formato:
+    //      "foo = 1\nbar = 2\n"
+    //    que es una tabla "inline" sin cabecera.
+    let section_item: Item = section_str
+      .parse::<DocumentMut>()
+      .map_err(|e| ConfigError::Other(format!("parse section as doc: {e}")))?
+      .into_item(); // convierte el DocumentMut a Item (tabla)
 
-    // 5) Serializar todo el documento de vuelta a String.
-    let serialized = toml::to_string_pretty(&root)
-      .map_err(|e| ConfigError::Other(format!("serialize toml: {e}")))?;
+    // 4) Insertar / reemplazar la sección en la raíz preservando comentarios externos.
+    doc[section] = section_item;
+
+    // 5) Serializar el documento completo preservando comentarios/espacios.
+    let serialized = doc.to_string();
 
     // 6) Escritura atómica usando gamus-fs.
     gamus_fs::atomic_write_str(&path, &serialized)?;
