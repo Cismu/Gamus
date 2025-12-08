@@ -22,7 +22,7 @@ pub const MIGRATIONS: diesel_migrations::EmbeddedMigrations = embed_migrations!(
 // Definimos un alias para el tipo de Pool para no escribirlo todo el tiempo
 type SqlitePool = Pool<ConnectionManager<SqliteConnection>>;
 
-#[derive(Clone)] // ¡Ahora podemos derivar Clone!
+#[derive(Clone)]
 pub struct SqliteLibraryRepository {
   pool: SqlitePool,
 }
@@ -222,7 +222,7 @@ fn release_to_new_row(release: &Release) -> NewReleaseRow {
 
 fn row_to_artist(row: ArtistRow) -> Artist {
   Artist {
-    id: ArtistId::from_uuid(Uuid::parse_str(&row.id).unwrap_or_default()), // unwrap_or_default es más seguro que expect en producción
+    id: ArtistId::from_uuid(Uuid::parse_str(&row.id).expect("Invalid UUID")),
     name: row.name,
     variations: vec![],
     bio: row.bio,
@@ -232,7 +232,7 @@ fn row_to_artist(row: ArtistRow) -> Artist {
 
 fn row_to_song(row: SongRow) -> Song {
   Song {
-    id: SongId::from_uuid(Uuid::parse_str(&row.id).unwrap_or_default()),
+    id: SongId::from_uuid(Uuid::parse_str(&row.id).expect("Invalid UUID")),
     title: row.title,
     acoustid: row.acoustid,
   }
@@ -240,7 +240,7 @@ fn row_to_song(row: SongRow) -> Song {
 
 fn row_to_release(row: ReleaseRow) -> Release {
   Release {
-    id: ReleaseId::from_uuid(Uuid::parse_str(&row.id).unwrap_or_default()),
+    id: ReleaseId::from_uuid(Uuid::parse_str(&row.id).expect("Invalid UUID")),
     title: row.title,
     release_type: vec![],
     main_artist_ids: vec![],
