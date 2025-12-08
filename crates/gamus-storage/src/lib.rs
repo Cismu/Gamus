@@ -2,6 +2,8 @@ pub mod config;
 pub mod models;
 pub mod schema;
 
+use std::path::PathBuf;
+
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
@@ -28,8 +30,9 @@ pub struct SqliteLibraryRepository {
 }
 
 impl SqliteLibraryRepository {
-  pub fn new(database_url: &str) -> Result<Self, CoreError> {
-    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+  pub fn new(db_path: &PathBuf, journal_mode: &Option<String>) -> Result<Self, CoreError> {
+    let db_path = db_path.to_str().ok_or(CoreError::Repository("Invalid db path".to_string()))?;
+    let manager = ConnectionManager::<SqliteConnection>::new(db_path);
 
     // Configuramos el pool
     let pool = r2d2::Pool::builder()
@@ -44,9 +47,11 @@ impl SqliteLibraryRepository {
     let mut conn = pool.get().map_err(|e| CoreError::Repository(e.to_string()))?;
 
     // Activamos WAL mode para mejor concurrencia (Lecturas y escrituras simultáneas)
-    diesel::sql_query("PRAGMA journal_mode = WAL;")
-      .execute(&mut conn)
-      .map_err(|e| CoreError::Repository(format!("wal error: {}", e)))?;
+    if let Some(mode) = journal_mode {
+      diesel::sql_query(format!("PRAGMA journal_mode = {}", mode))
+        .execute(&mut conn)
+        .map_err(|e| CoreError::Repository(format!("wal error: {}", e)))?;
+    }
 
     conn
       .run_pending_migrations(MIGRATIONS)
@@ -59,12 +64,8 @@ impl SqliteLibraryRepository {
     use crate::config::StorageConfig;
 
     let cfg = StorageConfig::load().map_err(|e| CoreError::Repository(e.to_string()))?;
-    let db_path = cfg.db_path();
 
-    // Convertimos path a string, manejando el error si tiene caracteres raros
-    let db_str = db_path.to_str().ok_or_else(|| CoreError::Repository("invalid db path".into()))?;
-
-    Self::new(db_str)
+    Self::new(&cfg.db_path, &cfg.journal_mode)
   }
 
   // Helper interno para obtener conexión de forma breve

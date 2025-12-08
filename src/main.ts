@@ -1,180 +1,123 @@
 import { invoke } from "@tauri-apps/api/core";
 
-function renderList(
-  selector: string,
-  items: { id: string; name?: string; title?: string }[]
-) {
-  const ul = document.querySelector<HTMLUListElement>(selector);
-  if (!ul) return;
-  ul.innerHTML = "";
-  items.forEach((i) => {
-    const li = document.createElement("li");
-    li.textContent = `${i.name ?? i.title} (${i.id})`;
-    ul.appendChild(li);
-  });
-}
-
-async function createArtist() {
-  const name = (document.querySelector("#artist-name") as HTMLInputElement)
-    .value;
-  const bio = (document.querySelector("#artist-bio") as HTMLInputElement).value;
-
-  await invoke("create_artist", {
-    input: { name, bio: bio || null },
-  });
-
-  alert("Artista creado!");
-}
-
-async function createSong() {
-  const title = (document.querySelector("#song-title") as HTMLInputElement)
-    .value;
-  const acoustid = (
-    document.querySelector("#song-acoustid") as HTMLInputElement
-  ).value;
-
-  await invoke("create_song", {
-    input: { title, acoustid: acoustid || null },
-  });
-
-  alert("Canción creada!");
-}
-
-async function loadArtists() {
-  const artists = await invoke<any[]>("list_artists");
-  renderList("#artists", artists);
-}
-
-async function loadSongs() {
-  const songs = await invoke<any[]>("list_songs");
-  renderList("#songs", songs);
-}
-
-async function scanLibrary() {
-  const result = await invoke<{
-    total_files: number;
-    devices: {
-      id: string;
-      bandwidth_mb_s: number | null;
-      file_count: number;
-    }[];
-  }>("scan_library");
-
-  const div = document.querySelector<HTMLDivElement>("#scan-result");
-  if (!div) return;
-
-  let html = `<p>Total de archivos: ${result.total_files}</p>`;
-  html += "<ul>";
-  for (const d of result.devices) {
-    html +=
-      `<li>Device ${d.id} – ${d.file_count} archivos` +
-      (d.bandwidth_mb_s != null ? ` (~${d.bandwidth_mb_s} MB/s)` : "") +
-      `</li>`;
-  }
-  html += "</ul>";
-
-  div.innerHTML = html;
-}
-
-type ScannerConfigDto = {
+// Definición exacta basada en tu Rust Struct
+interface ScannerConfigDto {
   roots: string[];
   audio_exts: string[];
   ignore_hidden: boolean;
   max_depth: number | null;
-};
-
-async function loadScannerConfig() {
-  const cfg = await invoke<ScannerConfigDto>("get_scanner_config");
-
-  const rootsArea =
-    document.querySelector<HTMLTextAreaElement>("#scanner-roots");
-  const extsInput = document.querySelector<HTMLInputElement>(
-    "#scanner-audio-exts"
-  );
-  const ignoreHidden = document.querySelector<HTMLInputElement>(
-    "#scanner-ignore-hidden"
-  );
-  const maxDepth =
-    document.querySelector<HTMLInputElement>("#scanner-max-depth");
-
-  if (!rootsArea || !extsInput || !ignoreHidden || !maxDepth) return;
-
-  rootsArea.value = cfg.roots.join("\n");
-  extsInput.value = cfg.audio_exts.join(", ");
-  ignoreHidden.checked = cfg.ignore_hidden;
-  maxDepth.value = cfg.max_depth != null ? String(cfg.max_depth) : "";
 }
 
-async function saveScannerConfig() {
-  const rootsArea =
-    document.querySelector<HTMLTextAreaElement>("#scanner-roots");
-  const extsInput = document.querySelector<HTMLInputElement>(
-    "#scanner-audio-exts"
-  );
-  const ignoreHidden = document.querySelector<HTMLInputElement>(
-    "#scanner-ignore-hidden"
-  );
-  const maxDepth =
-    document.querySelector<HTMLInputElement>("#scanner-max-depth");
+const statusMsg = document.querySelector("#status-msg") as HTMLParagraphElement;
+const statusBox = document.querySelector("#status-box") as HTMLDivElement;
 
-  if (!rootsArea || !extsInput || !ignoreHidden || !maxDepth) return;
+// Referencias al DOM
+const rootsInput = document.querySelector("#roots") as HTMLTextAreaElement;
+const extsInput = document.querySelector("#audio-exts") as HTMLInputElement;
+const hiddenInput = document.querySelector(
+  "#ignore-hidden"
+) as HTMLInputElement;
+const depthInput = document.querySelector("#max-depth") as HTMLInputElement;
 
-  const roots = rootsArea.value
+// --- Helpers ---
+
+function setStatus(msg: string, type: "info" | "success" | "error" = "info") {
+  statusMsg.textContent = msg;
+  statusBox.className = `status-box ${type}`;
+  statusBox.classList.remove("hidden");
+}
+
+// --- Lógica Principal ---
+
+async function loadConfig() {
+  try {
+    const config = await invoke<ScannerConfigDto>("scanner_get_config");
+
+    // 1. Convertir Array de rutas -> Texto (una por línea)
+    rootsInput.value = config.roots.join("\n");
+
+    // 2. Convertir Array de extensiones -> Texto (separado por comas)
+    extsInput.value = config.audio_exts.join(", ");
+
+    // 3. Boolean
+    hiddenInput.checked = config.ignore_hidden;
+
+    // 4. Option<u32> (si es null, dejar vacío)
+    depthInput.value =
+      config.max_depth !== null ? config.max_depth.toString() : "";
+
+    setStatus("Configuración cargada.", "info");
+  } catch (error) {
+    setStatus(`Error cargando config: ${error}`, "error");
+  }
+}
+
+async function saveConfig(e: Event) {
+  e.preventDefault();
+
+  // Parsear Roots: Dividir por saltos de línea y limpiar espacios vacíos
+  const rootsArray = rootsInput.value
     .split("\n")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 
-  const audio_exts = extsInput.value
+  // Parsear Extensiones: Dividir por comas y limpiar
+  const extsArray = extsInput.value
     .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .map((ext) => ext.trim())
+    .filter((ext) => ext.length > 0);
 
-  const maxDepthVal = maxDepth.value.trim();
-  const max_depth = maxDepthVal === "" ? null : Number(maxDepthVal);
+  // Parsear Depth: Si está vacío es null, sino es número
+  const depthValue =
+    depthInput.value === "" ? null : parseInt(depthInput.value);
 
-  const payload: ScannerConfigDto = {
-    roots,
-    audio_exts,
-    ignore_hidden: ignoreHidden.checked,
-    max_depth: Number.isNaN(max_depth as number) ? null : max_depth,
+  const newConfig: ScannerConfigDto = {
+    roots: rootsArray,
+    audio_exts: extsArray,
+    ignore_hidden: hiddenInput.checked,
+    max_depth: depthValue,
   };
 
-  await invoke("save_scanner_config", { input: payload });
-  alert("Scanner config guardada!");
+  try {
+    setStatus("Guardando...", "info");
+    // 'input' es el nombre del argumento en tu función Rust
+    await invoke("scanner_save_config", { input: newConfig });
+    setStatus("Configuración guardada exitosamente.", "success");
+  } catch (error) {
+    setStatus(`Error al guardar: ${error}`, "error");
+  }
 }
 
+async function startScan() {
+  try {
+    setStatus(
+      "⏳ Escaneando... revisa la terminal para logs detallados.",
+      "info"
+    );
+    const btn = document.querySelector("#btn-scan") as HTMLButtonElement;
+    btn.disabled = true;
+
+    await invoke("library_import_full");
+
+    setStatus("✅ Importación finalizada.", "success");
+  } catch (error) {
+    setStatus(`❌ Error: ${error}`, "error");
+  } finally {
+    const btn = document.querySelector("#btn-scan") as HTMLButtonElement;
+    btn.disabled = false;
+  }
+}
+
+// --- Init ---
+
 window.addEventListener("DOMContentLoaded", () => {
-  document.querySelector("#artist-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    createArtist();
-  });
-
-  document.querySelector("#song-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    createSong();
-  });
-
   document
-    .querySelector("#load-artists")
-    ?.addEventListener("click", loadArtists);
-  document.querySelector("#load-songs")?.addEventListener("click", loadSongs);
+    .querySelector("#config-form")
+    ?.addEventListener("submit", saveConfig);
+  document.querySelector("#btn-scan")?.addEventListener("click", startScan);
+  document
+    .querySelector("#btn-load-config")
+    ?.addEventListener("click", loadConfig);
 
-  document.querySelector("#scan-library")?.addEventListener("click", () => {
-    scanLibrary().catch((err) => {
-      console.error("scan_library error", err);
-      alert("Error al escanear biblioteca: " + err);
-    });
-  });
-
-  loadScannerConfig().catch((err) => {
-    console.error("get_scanner_config error", err);
-  });
-
-  document.querySelector("#scanner-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    saveScannerConfig().catch((err) => {
-      console.error("save_scanner_config error", err);
-      alert("Error al guardar scanner config: " + err);
-    });
-  });
+  loadConfig();
 });

@@ -1,89 +1,74 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
+    <title>Gamus Manager</title>
     <script type="module" src="/src/main.ts" defer></script>
   </head>
 
   <body>
     <main class="container">
-      <h2>Crear Artista</h2>
-      <form id="artist-form">
-        <input
-          type="text"
-          id="artist-name"
-          placeholder="Nombre del artista"
-          required
-        />
-        <input type="text" id="artist-bio" placeholder="Bio (opcional)" />
-        <button type="submit">Guardar artista</button>
-      </form>
+      <h1>Gamus Library</h1>
 
-      <h2>Crear Canción</h2>
-      <form id="song-form">
-        <input
-          type="text"
-          id="song-title"
-          placeholder="Título de la canción"
-          required
-        />
-        <input
-          type="text"
-          id="song-acoustid"
-          placeholder="AcoustID (opcional)"
-        />
-        <button type="submit">Guardar canción</button>
-      </form>
+      <div id="status-box" class="status-box hidden">
+        <p id="status-msg">...</p>
+      </div>
 
-      <hr />
+      <section class="card">
+        <h2>⚙️ Configuración del Escáner</h2>
+        <form id="config-form">
+          <div class="form-group">
+            <label for="roots">Carpetas de Música (Roots)</label>
+            <small>Una ruta por línea.</small>
+            <textarea
+              id="roots"
+              rows="4"
+              placeholder="/home/user/music&#10;D:\Music"
+            ></textarea>
+          </div>
 
-      <button id="load-artists">Listar artistas</button>
-      <ul id="artists"></ul>
+          <div class="form-group">
+            <label for="audio-exts">Extensiones de Audio</label>
+            <input type="text" id="audio-exts" placeholder="mp3, flac, m4a" />
+            <small>Separadas por comas.</small>
+          </div>
 
-      <button id="load-songs">Listar canciones</button>
-      <ul id="songs"></ul>
+          <div class="row-group">
+            <div class="form-group half">
+              <label for="max-depth">Profundidad Máx.</label>
+              <input
+                type="number"
+                id="max-depth"
+                placeholder="Ej: 5 (Vacío = Infinito)"
+                min="1"
+              />
+            </div>
 
-      <hr />
+            <div class="form-group half checkbox-container">
+              <input type="checkbox" id="ignore-hidden" />
+              <label for="ignore-hidden" class="inline-label"
+                >Ignorar ocultos (.files)</label
+              >
+            </div>
+          </div>
 
-      <button id="scan-library">Escanear biblioteca</button>
-      <div id="scan-result"></div>
-
-      <hr />
-
-      <section>
-        <h2>Scanner settings</h2>
-        <form id="scanner-form">
-          <label>
-            Roots (uno por línea):
-            <br />
-            <textarea id="scanner-roots" rows="4"></textarea>
-          </label>
-
-          <label>
-            Extensiones de audio (coma separadas):
-            <br />
-            <input id="scanner-audio-exts" type="text" />
-          </label>
-
-          <label>
-            <input id="scanner-ignore-hidden" type="checkbox" />
-            Ignorar archivos ocultos
-          </label>
-
-          <label>
-            Max depth (opcional):
-            <br />
-            <input id="scanner-max-depth" type="number" min="1" />
-          </label>
-
-          <button type="submit">Guardar scanner config</button>
+          <div class="actions">
+            <button type="button" id="btn-load-config" class="secondary">
+              Recargar
+            </button>
+            <button type="submit" id="btn-save-config">Guardar</button>
+          </div>
         </form>
       </section>
-    </main>
 
-    <script type="module" src="/src/main.ts"></script>
+      <section class="card">
+        <h2>📚 Operaciones</h2>
+        <button id="btn-scan" class="primary full-width">
+          INICIAR IMPORTACIÓN COMPLETA
+        </button>
+      </section>
+    </main>
   </body>
 </html>
