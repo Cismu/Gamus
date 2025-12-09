@@ -1,4 +1,5 @@
 mod config;
+mod infrastructure;
 
 use gamus_core::services::LibraryService;
 use gamus_metadata::FfmpegMetadataExtractor;
@@ -8,6 +9,7 @@ use gamus_storage::SqliteLibraryRepository;
 use tauri::{Manager, State};
 
 use crate::config::ScannerConfigDto;
+use infrastructure::system::gpu_tweak;
 
 struct AppState {
   library: LibraryService<GamusFileScanner, FfmpegMetadataExtractor, SqliteLibraryRepository>,
@@ -32,6 +34,8 @@ fn scanner_save_config(input: ScannerConfigDto) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  gpu_tweak::apply_linux_patches();
+
   tauri::Builder::default()
     .plugin(tauri_plugin_opener::init())
     .setup(|app| {

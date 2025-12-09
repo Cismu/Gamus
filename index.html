@@ -1,74 +1,13 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="">
   <head>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/styles.css" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gamus Manager</title>
-    <script type="module" src="/src/main.ts" defer></script>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vite App</title>
   </head>
-
   <body>
-    <main class="container">
-      <h1>Gamus Library</h1>
-
-      <div id="status-box" class="status-box hidden">
-        <p id="status-msg">...</p>
-      </div>
-
-      <section class="card">
-        <h2>⚙️ Configuración del Escáner</h2>
-        <form id="config-form">
-          <div class="form-group">
-            <label for="roots">Carpetas de Música (Roots)</label>
-            <small>Una ruta por línea.</small>
-            <textarea
-              id="roots"
-              rows="4"
-              placeholder="/home/user/music&#10;D:\Music"
-            ></textarea>
-          </div>
-
-          <div class="form-group">
-            <label for="audio-exts">Extensiones de Audio</label>
-            <input type="text" id="audio-exts" placeholder="mp3, flac, m4a" />
-            <small>Separadas por comas.</small>
-          </div>
-
-          <div class="row-group">
-            <div class="form-group half">
-              <label for="max-depth">Profundidad Máx.</label>
-              <input
-                type="number"
-                id="max-depth"
-                placeholder="Ej: 5 (Vacío = Infinito)"
-                min="1"
-              />
-            </div>
-
-            <div class="form-group half checkbox-container">
-              <input type="checkbox" id="ignore-hidden" />
-              <label for="ignore-hidden" class="inline-label"
-                >Ignorar ocultos (.files)</label
-              >
-            </div>
-          </div>
-
-          <div class="actions">
-            <button type="button" id="btn-load-config" class="secondary">
-              Recargar
-            </button>
-            <button type="submit" id="btn-save-config">Guardar</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>📚 Operaciones</h2>
-        <button id="btn-scan" class="primary full-width">
-          INICIAR IMPORTACIÓN COMPLETA
-        </button>
-      </section>
-    </main>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
