@@ -5,7 +5,12 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+apodize = "1.0.0"
 async-trait = "0.1.89"
 ffmpeg-next = "8.0.0"
 gamus-core = { version = "0.1.0", path = "../gamus-core" }
+num-traits = "0.2.19"
+rustfft = "6.4.1"
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.17"
 tokio = "1.48.0"
