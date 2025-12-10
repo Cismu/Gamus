@@ -2,7 +2,7 @@ use crate::domain::ids::{ArtistId, ReleaseId, SongId};
 use crate::domain::{artist::Artist, release::Release, song::Song};
 use crate::errors::CoreError;
 
-pub trait LibraryRepository {
+pub trait Library {
   // --- Métodos de Comando (Escritura) ---
   fn save_artist(&self, artist: &Artist) -> Result<(), CoreError>;
   fn save_song(&self, song: &Song) -> Result<(), CoreError>;

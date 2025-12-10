@@ -40,6 +40,6 @@ pub struct ExtractedMetadata {
 /// - Symphonia
 /// - combinaciones + servicios externos (MusicBrainz, etc.)
 #[async_trait::async_trait]
-pub trait MetadataExtractor: Send + Sync {
+pub trait Probe: Send + Sync {
   async fn extract_from_path(&self, path: &Path) -> Result<ExtractedMetadata, MetadataError>;
 }

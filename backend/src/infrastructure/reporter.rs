@@ -3,16 +3,18 @@ use gamus_core::ports::ProgressReporter;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-// Estructuras para los payloads de los eventos (para que el JSON sea limpio)
+/// DTO for serializing error details to the frontend.
 #[derive(Clone, Serialize)]
 struct ErrorPayload {
   path: String,
   error: String,
 }
 
+/// A `ProgressReporter` implementation that bridges backend events to the Tauri frontend.
+///
+/// This struct holds a reference to the `AppHandle`, allowing it to emit global events
 #[derive(Clone)]
 pub struct TauriReporter {
-  // AppHandle es barato de clonar y Thread-Safe
   app_handle: AppHandle,
 }
 
@@ -25,23 +27,21 @@ impl TauriReporter {
 #[async_trait]
 impl ProgressReporter for TauriReporter {
   async fn start(&self, total_files: usize) {
-    // Evento: "library:import:start" -> Payload: número (total)
+    // Fire-and-forget: We ignore emission errors (e.g., if the webview is closed)
+    // to prevent UI state from crashing the backend process.
     let _ = self.app_handle.emit("library:import:start", total_files);
   }
 
   async fn on_success(&self, path: &str) {
-    // Evento: "library:import:success" -> Payload: string (path)
     let _ = self.app_handle.emit("library:import:success", path);
   }
 
   async fn on_error(&self, path: &str, error: &str) {
-    // Evento: "library:import:error" -> Payload: objeto { path, error }
     let payload = ErrorPayload { path: path.to_string(), error: error.to_string() };
     let _ = self.app_handle.emit("library:import:error", payload);
   }
 
   async fn finish(&self) {
-    // Evento: "library:import:finish" -> Payload: null
     let _ = self.app_handle.emit("library:import:finish", ());
   }
 }

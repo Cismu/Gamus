@@ -1,6 +1,7 @@
 style_edition = "2024"
 
 tab_spaces = 2
+max_width = 120
 
 # This is also the setting used by [rustc](https://github.com/rust-lang/rust/blob/master/rustfmt.toml)
 use_small_heuristics = "Max"

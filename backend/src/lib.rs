@@ -2,9 +2,9 @@ mod config;
 mod infrastructure;
 
 use gamus_core::services::LibraryService;
-use gamus_metadata::FfmpegMetadataExtractor;
-use gamus_scanner::{GamusFileScanner, ScannerConfig};
-use gamus_storage::SqliteLibraryRepository;
+use gamus_metadata::FfmpegProbe;
+use gamus_scanner::{FsScanner, ScannerConfig};
+use gamus_storage::LibraryStore;
 
 use tauri::{Manager, State};
 
@@ -14,8 +14,7 @@ use infrastructure::system::gpu_tweak;
 use infrastructure::reporter::TauriReporter;
 
 // 1. Alias para no volvernos locos con los genéricos
-type ConcreteLibraryService =
-  LibraryService<GamusFileScanner, FfmpegMetadataExtractor, SqliteLibraryRepository, TauriReporter>;
+type ConcreteLibraryService = LibraryService<FsScanner, FfmpegProbe, LibraryStore, TauriReporter>;
 
 struct AppState {
   library: ConcreteLibraryService,
@@ -48,13 +47,9 @@ pub fn run() {
     .plugin(tauri_plugin_opener::init())
     .setup(|app| {
       // 2. Inicializamos los puertos
-      let storage = SqliteLibraryRepository::new_from_config()?;
-      // Recuerda que ahora GamusFileScanner tiene caché interna
-      let scanner = GamusFileScanner::new();
-      let metadata = FfmpegMetadataExtractor::new();
-
-      // 3. Inicializamos el Reporter con el AppHandle de Tauri
-      // app.handle() nos da el control global para emitir eventos
+      let storage = LibraryStore::new_from_config()?;
+      let scanner = FsScanner::new();
+      let metadata = FfmpegProbe::new();
       let reporter = TauriReporter::new(app.handle().clone());
 
       // 4. Inyectamos todo en el Servicio
@@ -65,11 +60,7 @@ pub fn run() {
 
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![
-      library_import_full,
-      scanner_get_config,
-      scanner_save_config,
-    ])
+    .invoke_handler(tauri::generate_handler![library_import_full, scanner_get_config, scanner_save_config,])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

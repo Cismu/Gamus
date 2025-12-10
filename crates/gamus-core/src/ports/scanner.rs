@@ -49,6 +49,6 @@ pub enum ScanError {
 /// puede ser hiper-paralelo por dentro, pero desde el dominio se ve como
 /// una operación síncrona que devuelve los resultados ya agrupados.
 #[async_trait]
-pub trait FileScanner: Send + Sync {
+pub trait Scanner: Send + Sync {
   async fn scan_library_files(&self) -> Result<Vec<ScanGroup>, ScanError>;
 }

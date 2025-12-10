@@ -1,9 +1,9 @@
-pub mod library_repository;
+pub mod library;
 pub mod metadata;
 pub mod progress;
 pub mod scanner;
 
-pub use library_repository::LibraryRepository;
-pub use metadata::{ExtractedMetadata, MetadataError, MetadataExtractor};
+pub use library::Library;
+pub use metadata::{ExtractedMetadata, MetadataError, Probe};
 pub use progress::ProgressReporter;
-pub use scanner::{FileScanner, ScanDevice, ScanError, ScanGroup, ScannedFile};
+pub use scanner::{ScanDevice, ScanError, ScanGroup, ScannedFile, Scanner};

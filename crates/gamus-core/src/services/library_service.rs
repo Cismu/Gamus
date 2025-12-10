@@ -3,7 +3,7 @@ use crate::domain::release::Release;
 use crate::domain::song::Song;
 use crate::domain::{ArtistId, ReleaseId, SongId};
 use crate::errors::CoreError;
-use crate::ports::{FileScanner, LibraryRepository, MetadataExtractor, ProgressReporter};
+use crate::ports::{Library, Probe, ProgressReporter, Scanner};
 
 use futures::stream::{self, StreamExt};
 
@@ -13,9 +13,9 @@ use futures::stream::{self, StreamExt};
 /// Decide las políticas de concurrencia basándose en la información del Scanner.
 pub struct LibraryService<S, M, R, P>
 where
-  S: FileScanner + Clone, // Necesitamos Clone para pasarlo a hilos si fuera necesario
-  M: MetadataExtractor + Clone, // Necesitamos Clone para que cada hilo tenga su extractor
-  R: LibraryRepository + Clone, // Necesitamos Clone para que cada hilo tenga su conexión a DB
+  S: Scanner + Clone,  // Necesitamos Clone para pasarlo a hilos si fuera necesario
+  M: Probe + Clone,    // Necesitamos Clone para que cada hilo tenga su extractor
+  R: Library + Clone,  // Necesitamos Clone para que cada hilo tenga su conexión a DB
   P: ProgressReporter, // El reporter suele ser un canal (mpsc) o Arc interno, no necesita Clone explícito aquí si es referencia compartida, pero Clone ayuda.
 {
   scanner: S,
@@ -26,9 +26,9 @@ where
 
 impl<S, M, R, P> LibraryService<S, M, R, P>
 where
-  S: FileScanner + Clone,
-  M: MetadataExtractor + Clone,
-  R: LibraryRepository + Clone,
+  S: Scanner + Clone,
+  M: Probe + Clone,
+  R: Library + Clone,
   P: ProgressReporter,
 {
   pub fn new(scanner: S, metadata: M, repo: R, reporter: P) -> Self {
@@ -53,8 +53,7 @@ where
   pub async fn import_full(&self) -> Result<(), CoreError> {
     // 1. ESCANEO: Obtener grupos de archivos (agrupados por dispositivo físico)
     //    Esto llama al puerto, que a su vez usa el adaptador de gamus-scanner
-    let groups =
-      self.scanner.scan_library_files().await.map_err(|e| CoreError::Scan(e.to_string()))?;
+    let groups = self.scanner.scan_library_files().await.map_err(|e| CoreError::Scan(e.to_string()))?;
 
     // Calculamos el total global para inicializar la barra de progreso
     let total_files: usize = groups.iter().map(|g| g.files.len()).sum();
@@ -90,15 +89,11 @@ where
 
             // --- PASO 2: Persistencia (IO Write / DB) ---
             // Guardar Song
-            repo
-              .save_song(&extracted.song)
-              .map_err(|e| (path_str.clone(), format!("Repo song error: {}", e)))?;
+            repo.save_song(&extracted.song).map_err(|e| (path_str.clone(), format!("Repo song error: {}", e)))?;
 
             // Guardar Release (si existe)
             if let Some(release) = &extracted.release {
-              repo
-                .save_release(release)
-                .map_err(|e| (path_str.clone(), format!("Repo release error: {}", e)))?;
+              repo.save_release(release).map_err(|e| (path_str.clone(), format!("Repo release error: {}", e)))?;
             }
 
             // Guardar Track / Relación (Pendiente de implementar en tus repos)
