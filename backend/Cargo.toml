@@ -28,3 +28,4 @@ gamus-storage = { version = "0.1.0", path = "../crates/gamus-storage" }
 gamus-scanner = { version = "0.1.0", path = "../crates/gamus-scanner" }
 anyhow = "1.0.100"
 gamus-metadata = { version = "0.1.0", path = "../crates/gamus-metadata" }
+async-trait = "0.1.89"

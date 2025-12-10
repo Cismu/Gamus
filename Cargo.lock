@@ -1233,6 +1233,7 @@ name = "gamus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "gamus-core",
  "gamus-metadata",
  "gamus-scanner",
@@ -1263,6 +1264,7 @@ name = "gamus-core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures",
  "serde",
  "thiserror 2.0.17",
  "uuid",

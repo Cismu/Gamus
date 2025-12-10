@@ -11,6 +11,7 @@ use gamus_core::domain::{
 };
 use gamus_core::ports::{ExtractedMetadata, MetadataError, MetadataExtractor};
 
+#[derive(Clone)]
 pub struct FfmpegMetadataExtractor;
 
 impl FfmpegMetadataExtractor {

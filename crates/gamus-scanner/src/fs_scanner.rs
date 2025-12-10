@@ -131,11 +131,14 @@ pub async fn scan_music_with_cfg(cfg: &ScannerConfig) -> Result<Vec<FsScannedFil
   Ok(all_files)
 }
 
-/// Escaneo completo async:
-///  - detecta archivos
-///  - agrupa por dispositivo
-///  - mide bandwidth por device con `spawn_blocking`.
-pub async fn scan_groups_async() -> Result<Vec<FsScanGroup>, ScannerError> {
+/// Escaneo completo async con "Memoización" de velocidad:
+///  - Detecta archivos.
+///  - Agrupa por dispositivo.
+///  - Si el dispositivo YA está en `known_speeds`, usa ese valor (evita cache hit falso).
+///  - Si es nuevo, mide con `spawn_blocking`.
+pub async fn scan_groups_async(
+  known_speeds: &HashMap<String, u64>,
+) -> Result<Vec<FsScanGroup>, ScannerError> {
   let cfg = ScannerConfig::load()?;
   let files = scan_music_with_cfg(&cfg).await?;
 
@@ -154,31 +157,47 @@ pub async fn scan_groups_async() -> Result<Vec<FsScanGroup>, ScannerError> {
     by_device.entry(dev_id).or_default().push(f);
   }
 
-  // 2) spawn_blocking por device para medir throughput
-  let sample_bytes = 3 * 1_048_576; // 3 MiB
+  // 2) Preparar tareas de medición
+  // Aumentamos la muestra a 20 MB para amortiguar lecturas falsas
+  const SAMPLE_BYTES: u64 = 20 * 1_048_576;
   let mut handles = Vec::new();
 
   for (dev_id, files) in by_device {
-    let sample_path = files.get(0).map(|f| f.path.clone());
+    // CASO A: Ya conocemos la velocidad de este dispositivo (está en caché)
+    // No volvemos a medir para evitar lecturas "hot" de RAM a 1000MB/s
+    if let Some(&cached_speed) = known_speeds.get(&dev_id) {
+      // Creamos una tarea dummy que retorna inmediatamente el valor conocido
+      let files_clone = files; // Movemos ownership
+      let dev_id_clone = dev_id.clone();
 
-    let handle = task::spawn_blocking(move || {
-      let bw_opt = sample_path
-        .as_ref()
-        .and_then(|p| measure_device_throughput(p, sample_bytes).ok())
-        .map(|bw| bw as u64);
+      let handle = tokio::spawn(async move { (dev_id_clone, Some(cached_speed), files_clone) });
+      handles.push(handle);
+    }
+    // CASO B: Dispositivo nuevo, hay que medir "en frío"
+    else {
+      let sample_path = files.get(0).map(|f| f.path.clone());
 
-      (dev_id, bw_opt, files)
-    });
+      // Usamos spawn_blocking porque leer 20MB bloquea el hilo
+      let handle = task::spawn_blocking(move || {
+        let bw_opt = sample_path
+          .as_ref()
+          .and_then(|p| measure_device_throughput(p, SAMPLE_BYTES as usize).ok())
+          .map(|bw| bw as u64);
 
-    handles.push(handle);
+        (dev_id, bw_opt, files)
+      });
+      handles.push(handle);
+    }
   }
 
   // 3) Recolectar resultados
   let mut groups = Vec::new();
 
   for h in handles {
+    // Handle join error
     let (dev_id, bw_opt, files) =
       h.await.map_err(|e| ScannerError::Walker(format!("join error: {e}")))?;
+
     let device = FsDevice { id: dev_id, bandwidth_mb_s: bw_opt };
     groups.push(FsScanGroup { device, files });
   }
