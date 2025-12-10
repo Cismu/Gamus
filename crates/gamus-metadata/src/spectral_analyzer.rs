@@ -11,9 +11,9 @@
 //! 4. Analyzes the spectrum dB drop-off relative to a reference band.
 
 use ffmpeg_next as ffmpeg;
+use gamus_core::domain::release_track::{AnalysisOutcome, AudioQuality, AudioQualityReport, QualityLevel};
 use num_traits::Zero;
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
-use serde::Serialize;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -66,52 +66,6 @@ pub enum AnalysisError {
   InvalidAudioFormat,
 }
 
-// --- Reporting / UI model ---
-
-/// Categorical quality level for UI consumption (badges, filtering).
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum QualityLevel {
-  Perfect,
-  High,
-  Medium,
-  Low,
-  Inconclusive,
-}
-
-/// High-level report designed for API/Frontend consumption.
-/// Abstracts away FFT internals (bins, window functions) into human-readable metrics.
-#[derive(Debug, Clone, Serialize)]
-pub struct AudioQualityReport {
-  pub level: QualityLevel,
-  /// Normalized score 0.0–10.0 based on cutoff frequency.
-  pub score: f32,
-  pub label: String,
-  pub summary: String,
-  pub details: Option<String>,
-  pub cutoff_freq_hz: Option<f32>,
-  pub max_freq_hz: Option<f32>,
-}
-
-// --- Internal Result ---
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AudioAnalysis {
-  pub outcome: AnalysisOutcome,
-  pub quality_score: f32,
-  pub assessment: String,
-  pub report: AudioQualityReport,
-}
-
-/// Discriminated union of analysis states.
-/// Used for pattern matching the specific heuristic triggered during analysis.
-#[derive(Debug, PartialEq, Clone, Serialize)]
-pub enum AnalysisOutcome {
-  CutoffDetected { freq: f32, ref_db: f32, cut_db: f32 },
-  NoCutoffDetected { ref_db: f32, max_freq: f32 },
-  Inconclusive(String),
-}
-
 // --- Analyzer ---
 
 pub struct SpectralAnalyzer {
@@ -150,7 +104,7 @@ impl SpectralAnalyzer {
     }
   }
 
-  pub fn analyze_file(&mut self, path: &Path) -> Result<AudioAnalysis, AnalysisError> {
+  pub fn analyze_file(&mut self, path: &Path) -> Result<AudioQuality, AnalysisError> {
     let (sample_rate, avg_spectrum) = self.compute_average_spectrum(path)?;
 
     //
@@ -410,8 +364,8 @@ impl SpectralAnalyzer {
     }
   }
 
-  /// Maps the technical `AnalysisOutcome` to a user-facing `AudioAnalysis` score and report.
-  fn score_outcome(&self, outcome: AnalysisOutcome) -> AudioAnalysis {
+  /// Maps the technical `AnalysisOutcome` to a user-facing `AudioQuality` score and report.
+  fn score_outcome(&self, outcome: AnalysisOutcome) -> AudioQuality {
     let (score, assessment) = match &outcome {
       AnalysisOutcome::CutoffDetected { freq, .. } => {
         // Scoring rubric based on standard encoding cutoffs:
@@ -435,7 +389,7 @@ impl SpectralAnalyzer {
 
     let report = self.build_report(&outcome, score, &assessment);
 
-    AudioAnalysis { outcome, quality_score: score, assessment, report }
+    AudioQuality { outcome, quality_score: score, assessment, report }
   }
 
   /// Generates the human-readable report.

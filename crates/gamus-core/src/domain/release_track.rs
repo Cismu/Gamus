@@ -119,13 +119,49 @@ pub struct AudioAnalysis {
 ///   Ejemplo:
 ///   - `"Excelente: sin pérdida perceptible"`
 ///   - `"Compresión fuerte: artefactos audibles"`
+
+/// Categorical quality level for UI consumption (badges, filtering).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityLevel {
+  Perfect,
+  High,
+  Medium,
+  Low,
+  Inconclusive,
+}
+
+/// High-level report designed for API/Frontend consumption.
+/// Abstracts away FFT internals (bins, window functions) into human-readable metrics.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AudioQualityReport {
+  pub level: QualityLevel,
+  /// Normalized score 0.0–10.0 based on cutoff frequency.
+  pub score: f32,
+  pub label: String,
+  pub summary: String,
+  pub details: Option<String>,
+  pub cutoff_freq_hz: Option<f32>,
+  pub max_freq_hz: Option<f32>,
+}
+
+// --- Internal Result ---
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AudioQuality {
-  /// Puntuación cuantitativa de la calidad.
-  pub score: f32,
-
-  /// Descripción textual de la calidad percibida.
+  pub outcome: AnalysisOutcome,
+  pub quality_score: f32,
   pub assessment: String,
+  pub report: AudioQualityReport,
+}
+
+/// Discriminated union of analysis states.
+/// Used for pattern matching the specific heuristic triggered during analysis.
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum AnalysisOutcome {
+  CutoffDetected { freq: f32, ref_db: f32, cut_db: f32 },
+  NoCutoffDetected { ref_db: f32, max_freq: f32 },
+  Inconclusive(String),
 }
 
 /// Describe el archivo físico en disco asociado a la pista.

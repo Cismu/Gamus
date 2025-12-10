@@ -66,7 +66,7 @@ pub fn run() {
 
       // 3. Metadata Adapter (FFmpeg)
       // Initializes internal FFmpeg contexts.
-      let metadata = FfmpegProbe::new();
+      let metadata = FfmpegProbe::default();
 
       // 4. Output Port Adapter (UI Events)
       // Wraps the Tauri AppHandle to emit events back to the WebView.
