@@ -58,9 +58,8 @@ impl SpectralAnalyzer {
   /// API pública principal: analiza un fichero y devuelve AudioQuality.
   pub fn analyze_file(&mut self, path: &Path) -> Result<AudioQuality, AnalysisError> {
     let (sample_rate, avg_spectrum, bitrate_opt) = self.compute_average_spectrum(path)?;
-    let noise_like = self.is_noise_like(&avg_spectrum, sample_rate);
     let outcome = self.detect_cutoff(&avg_spectrum, sample_rate);
-    Ok(self.score_outcome(outcome, bitrate_opt, noise_like))
+    Ok(self.score_outcome(outcome, bitrate_opt))
   }
 
   fn compute_average_spectrum(&mut self, path: &Path) -> Result<(u32, Vec<f32>, Option<i64>), AnalysisError> {
@@ -207,44 +206,6 @@ impl SpectralAnalyzer {
     Some(sum / (e_bin - s_bin) as f32)
   }
 
-  /// Devuelve true si el espectro es "demasiado plano" en 200Hz–16kHz,
-  /// lo que suele indicar ruido blanco / síntesis muy cruda.
-  fn is_noise_like(&self, spectrum_db: &[f32], sample_rate: u32) -> bool {
-    let nyquist = sample_rate as f32 / 2.0;
-    let low = 200.0;
-    let high = nyquist.min(16_000.0);
-    if high <= low {
-      return false;
-    }
-
-    let bin_width = nyquist / spectrum_db.len() as f32;
-    let start_bin = (low / bin_width) as usize;
-    let end_bin = ((high / bin_width) as usize).min(spectrum_db.len());
-
-    if start_bin + 10 >= end_bin {
-      // muy pocas muestras, no nos fiamos
-      return false;
-    }
-
-    let slice = &spectrum_db[start_bin..end_bin];
-
-    // media
-    let mean: f32 = slice.iter().sum::<f32>() / slice.len() as f32;
-
-    // desviación estándar
-    let var: f32 = slice
-      .iter()
-      .map(|v| {
-        let d = v - mean;
-        d * d
-      })
-      .sum::<f32>()
-      / slice.len() as f32;
-    let std_dev = var.sqrt();
-
-    std_dev < self.config.noise.flat_spectrum_std_threshold_db
-  }
-
   fn process_fft_window(&mut self, samples: &[f32], acc: &mut [f32]) {
     for (i, &sample) in samples.iter().enumerate() {
       self.fft_buffer[i] = Complex::new(sample * self.window[i], 0.0);
@@ -302,7 +263,7 @@ impl SpectralAnalyzer {
     }
   }
 
-  fn score_outcome(&self, outcome: AnalysisOutcome, bitrate: Option<i64>, noise_like: bool) -> AudioQuality {
+  fn score_outcome(&self, outcome: AnalysisOutcome, bitrate: Option<i64>) -> AudioQuality {
     let (mut score, mut assessment) = match &outcome {
       AnalysisOutcome::CutoffDetected { freq, .. } => {
         let s = self.config.scoring.score_for_cutoff(*freq);
@@ -318,13 +279,6 @@ impl SpectralAnalyzer {
     // SAFETY NET de bitrate, ahora encapsulado en BitrateSafetyConfig
     if let Some(br) = bitrate {
       self.config.bitrate_safety.apply_cap(br, &mut score, &mut assessment);
-    }
-
-    if noise_like {
-      if bitrate.unwrap_or(0) < 800_000 {
-        score = score.min(5.0);
-        assessment += " (Espectro muy plano, posible ruido/sintético)";
-      }
     }
 
     let report = self.build_report(&outcome, score, &assessment);

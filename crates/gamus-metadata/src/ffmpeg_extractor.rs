@@ -86,7 +86,6 @@ fn extract_sync(path: &Path, analysis_config: Option<AnalysisConfig>) -> Result<
   let a = quality.clone().unwrap().report.details;
 
   match r {
-    QualityLevel::Medium => println!("{} - Audio quality: Medium ({:?})", path.display(), a),
     QualityLevel::Low => println!("{} - Audio quality: Low ({:?})", path.display(), a),
     _ => {}
   }
