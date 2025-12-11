@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use ffmpeg_next as ffmpeg;
 
 use gamus_core::domain::release::Release;
-use gamus_core::domain::release_track::{AudioAnalysis, AudioQuality};
+use gamus_core::domain::release_track::{AudioAnalysis, AudioQuality, QualityLevel};
 use gamus_core::domain::release_type::ReleaseType;
 use gamus_core::domain::{
   genre_styles::{Genre, Style},
@@ -17,7 +17,8 @@ use gamus_core::domain::{
 };
 use gamus_core::ports::{ExtractedMetadata, MetadataError, Probe};
 
-use crate::spectral_analyzer::{AnalysisConfig, SpectralAnalyzer};
+use crate::config::AnalysisConfig;
+use crate::spectral_analyzer::SpectralAnalyzer;
 use crate::tag_keys::*;
 
 /// Adaptador FFmpeg que implementa el port `Probe`.
@@ -80,6 +81,16 @@ fn extract_sync(path: &Path, analysis_config: Option<AnalysisConfig>) -> Result<
   let (duration, bitrate_kbps) = extract_container_level_audio_info(&context);
   let (sample_rate_hz, channels) = extract_stream_level_audio_info(&mut context);
   let quality = run_spectral_analysis(path, analysis_config)?;
+
+  let r = quality.clone().unwrap().report.level;
+  let a = quality.clone().unwrap().report.details;
+
+  match r {
+    QualityLevel::Medium => println!("{} - Audio quality: Medium ({:?})", path.display(), a),
+    QualityLevel::Low => println!("{} - Audio quality: Low ({:?})", path.display(), a),
+    _ => {}
+  }
+
   let analysis = AudioAnalysis { bpm: None, features: None, quality };
 
   let audio_details =
@@ -217,7 +228,7 @@ fn run_spectral_analysis(
     return Ok(None);
   };
 
-  let mut analyzer = SpectralAnalyzer::new(config);
+  let mut analyzer = SpectralAnalyzer::new();
   match analyzer.analyze_file(path) {
     Ok(result) => Ok(Some(result)),
     Err(e) => {
