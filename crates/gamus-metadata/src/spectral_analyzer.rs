@@ -1,3 +1,12 @@
+//! Implementación del analizador espectral basado en FFmpeg + rustfft.
+//!
+//! Responsabilidades principales:
+//! - Leer audio de fichero usando FFmpeg.
+//! - Convertir a mono float32 y limitar duración de análisis.
+//! - Acumular espectros de ventanas FFT con ventana de Hann.
+//! - Detectar cutoff en altas frecuencias.
+//! - Mapear resultado a `AudioQuality` + `AudioQualityReport`.
+
 use ffmpeg_next as ffmpeg;
 
 use gamus_core::domain::release_track::{AnalysisOutcome, AudioQuality, AudioQualityReport, QualityLevel};
@@ -8,22 +17,29 @@ use std::sync::Arc;
 
 use crate::config::AnalysisConfig;
 
-// --- Errors idénticos a los que ya tienes ---
-
+/// Errores posibles durante el análisis espectral.
+///
+/// Envuelven errores de E/S y de FFmpeg, y validan que el stream de
+/// audio sea decodificable y no esté vacío.
 #[derive(thiserror::Error, Debug)]
 pub enum AnalysisError {
   #[error("File open error: {0}")]
   FileOpen(#[from] std::io::Error),
+
   #[error("FFmpeg error: {0}")]
   FFmpeg(#[from] ffmpeg::Error),
+
   #[error("No compatible audio track found")]
   NoCompatibleTrack,
+
   #[error("Invalid audio format or empty stream")]
   InvalidAudioFormat,
 }
 
-// --- Analyzer ---
-
+/// Analizador espectral de una sola pasada sobre el archivo.
+///
+/// El estado interno (`fft_buffer`, `scratch_buffer`, `window`) se
+/// reutiliza entre análisis para minimizar asignaciones.
 pub struct SpectralAnalyzer {
   config: AnalysisConfig,
   fft: Arc<dyn Fft<f32>>,
@@ -33,10 +49,15 @@ pub struct SpectralAnalyzer {
 }
 
 impl SpectralAnalyzer {
+  /// Crea un analizador con `AnalysisConfig::default()`.
   pub fn new() -> Self {
     Self::new_with_config(AnalysisConfig::default())
   }
 
+  /// Crea un analizador con una configuración explícita.
+  ///
+  /// Útil para tests, tuning o entornos con requisitos especiales de
+  /// rendimiento/precisión.
   pub fn new_with_config(config: AnalysisConfig) -> Self {
     let _ = ffmpeg::init();
 
@@ -55,13 +76,26 @@ impl SpectralAnalyzer {
     }
   }
 
-  /// API pública principal: analiza un fichero y devuelve AudioQuality.
+  /// API pública principal: analiza un fichero y devuelve `AudioQuality`.
+  ///
+  /// El flujo es:
+  /// 1. Cálculo de espectro promedio (por ventanas FFT).
+  /// 2. Detección de cutoff / full band.
+  /// 3. Scoring + caps por bitrate + reporte de alto nivel.
   pub fn analyze_file(&mut self, path: &Path) -> Result<AudioQuality, AnalysisError> {
     let (sample_rate, avg_spectrum, bitrate_opt) = self.compute_average_spectrum(path)?;
     let outcome = self.detect_cutoff(&avg_spectrum, sample_rate);
     Ok(self.score_outcome(outcome, bitrate_opt))
   }
 
+  /// Calcula el espectro medio (en dB) del fichero.
+  ///
+  /// - Escoge el mejor stream de audio con FFmpeg.
+  /// - Re-muestrea a mono float32.
+  /// - Aplica ventanas FFT con Hann.
+  /// - Promedia el módulo del espectro en todas las ventanas.
+  ///
+  /// Respeta `max_analysis_duration_secs` para acotar el trabajo.
   fn compute_average_spectrum(&mut self, path: &Path) -> Result<(u32, Vec<f32>, Option<i64>), AnalysisError> {
     let mut ictx = ffmpeg::format::input(path)?;
     let input_stream = ictx.streams().best(ffmpeg::media::Type::Audio).ok_or(AnalysisError::NoCompatibleTrack)?;
@@ -95,6 +129,7 @@ impl SpectralAnalyzer {
     let mut total_samples_processed = 0usize;
     let mut stop = false;
 
+    // Función local para procesar una tira de samples mono.
     let mut process_plane = |plane: &[f32], analyzer: &mut SpectralAnalyzer| {
       for &sample in plane {
         samples_buffer.push(sample);
@@ -149,6 +184,7 @@ impl SpectralAnalyzer {
       }
     }
 
+    // Flush final para vaciar buffers de decoder / resampler.
     if !stop {
       decoder.send_eof()?;
       let mut decoded = ffmpeg::util::frame::Audio::empty();
@@ -187,6 +223,9 @@ impl SpectralAnalyzer {
     Ok((sample_rate, avg_spectrum_db, bitrate_opt))
   }
 
+  /// Media en dB del espectro en una banda [start, end] (Hz).
+  ///
+  /// Devuelve `None` si la banda queda fuera de Nyquist o no hay bins suficientes.
   fn band_db(&self, spectrum_db: &[f32], sample_rate: u32, start: f32, end: f32) -> Option<f32> {
     let nyquist = sample_rate as f32 / 2.0;
     if start >= nyquist {
@@ -206,6 +245,9 @@ impl SpectralAnalyzer {
     Some(sum / (e_bin - s_bin) as f32)
   }
 
+  /// Procesa una ventana FFT y acumula el módulo del espectro en `acc`.
+  ///
+  /// Aplica ventana de Hann precomputada y usa FFT in-place con scratch buffer.
   fn process_fft_window(&mut self, samples: &[f32], acc: &mut [f32]) {
     for (i, &sample) in samples.iter().enumerate() {
       self.fft_buffer[i] = Complex::new(sample * self.window[i], 0.0);
@@ -218,6 +260,13 @@ impl SpectralAnalyzer {
 
   // ---- Lógica de cutoff con la nueva config ----
 
+  /// Detecta cutoff o espectro completo a partir del espectro medio.
+  ///
+  /// Estrategia:
+  /// - Calcula un noise floor (base + margen dinámico).
+  /// - Escanea en reversa desde Nyquist en bandas configurables.
+  /// - La última banda con energía por encima del floor define `found_cutoff_freq`.
+  /// - Si está suficientemente lejos de Nyquist (`margin_from_nyquist_hz`), se considera cutoff.
   fn detect_cutoff(&self, spectrum_db: &[f32], sample_rate: u32) -> AnalysisOutcome {
     let nyquist = sample_rate as f32 / 2.0;
 
@@ -263,6 +312,7 @@ impl SpectralAnalyzer {
     }
   }
 
+  /// Asigna una puntuación al resultado del análisis y aplica caps por bitrate.
   fn score_outcome(&self, outcome: AnalysisOutcome, bitrate: Option<i64>) -> AudioQuality {
     let (mut score, mut assessment) = match &outcome {
       AnalysisOutcome::CutoffDetected { freq, .. } => {
@@ -285,6 +335,7 @@ impl SpectralAnalyzer {
     AudioQuality { outcome, quality_score: score, assessment, report }
   }
 
+  /// Construye el `AudioQualityReport` de alto nivel a partir del resultado.
   fn build_report(&self, outcome: &AnalysisOutcome, score: f32, assessment: &str) -> AudioQualityReport {
     let level = if score >= 9.5 {
       QualityLevel::Perfect
